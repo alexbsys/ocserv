@@ -455,9 +455,6 @@ static void co_del_helper(void *data)
 		co_delete(tctx->co_curr->caller);
 		co_call((coroutine_t) cdh);
 		if (tctx->co_dhelper == NULL) {
-			fprintf(stderr,
-				"[PCL] Resume to delete helper coroutine: curr=%p caller=%p\n",
-				tctx->co_curr, tctx->co_curr->caller);
 			exit(1);
 		}
 	}

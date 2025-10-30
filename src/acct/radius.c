@@ -21,20 +21,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 #include <unistd.h>
 #include <vpn.h>
-#include <c-ctype.h>
+#include <ctype.h>
 #include <arpa/inet.h> /* inet_ntop */
 #include "radius.h"
 #include "auth/common.h"
 
+#include "log.h"
+
 #ifdef HAVE_RADIUS
 
 #ifdef LEGACY_RADIUS
-# include <freeradius-client.h>
+#include <freeradius-client.h>
 #else
-# include <radcli/radcli.h>
+#include <radcli/radcli.h>
 #endif
 
 #include <sec-mod-acct.h>
@@ -60,21 +61,23 @@ static void acct_radius_vhost_init(void **_vctx, void *pool, void *additional)
 	}
 
 	if (config->nas_identifier) {
-		strlcpy(vctx->nas_identifier, config->nas_identifier, sizeof(vctx->nas_identifier));
+		strlcpy(vctx->nas_identifier, config->nas_identifier,
+			sizeof(vctx->nas_identifier));
 	} else {
 		vctx->nas_identifier[0] = 0;
 	}
 
-	if (rc_read_dictionary(vctx->rh, rc_conf_str(vctx->rh, "dictionary")) != 0) {
+	if (rc_read_dictionary(vctx->rh, rc_conf_str(vctx->rh, "dictionary")) !=
+	    0) {
 		fprintf(stderr, "error reading the radius dictionary\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	*_vctx = vctx;
 
 	return;
- fail:
+fail:
 	fprintf(stderr, "radius initialization error\n");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 static void acct_radius_vhost_deinit(void *_vctx)
@@ -105,16 +108,17 @@ static void append_stats(rc_handle *rh, VALUE_PAIR **send, stats_st *stats)
 
 	uout = stats->bytes_out / 4294967296;
 	rc_avpair_add(rh, send, PW_ACCT_OUTPUT_GIGAWORDS, &uout, -1, 0);
-
-	return;
 }
 
-static void append_acct_standard(struct radius_vhost_ctx *vctx, rc_handle *rh, const common_acct_info_st *ai, VALUE_PAIR **send)
+static void append_acct_standard(struct radius_vhost_ctx *vctx, rc_handle *rh,
+				 const common_acct_info_st *ai,
+				 VALUE_PAIR **send)
 {
 	uint32_t i;
 
 	if (vctx->nas_identifier[0] != 0) {
-		rc_avpair_add(rh, send, PW_NAS_IDENTIFIER, vctx->nas_identifier, -1, 0);
+		rc_avpair_add(rh, send, PW_NAS_IDENTIFIER, vctx->nas_identifier,
+			      -1, 0);
 	}
 
 	if (ai->our_ip[0] != 0) {
@@ -123,9 +127,11 @@ static void append_acct_standard(struct radius_vhost_ctx *vctx, rc_handle *rh, c
 
 		if (inet_pton(AF_INET, ai->our_ip, &in) != 0) {
 			in.s_addr = ntohl(in.s_addr);
-			rc_avpair_add(rh, send, PW_NAS_IP_ADDRESS, (char*)&in, sizeof(struct in_addr), 0);
+			rc_avpair_add(rh, send, PW_NAS_IP_ADDRESS, (char *)&in,
+				      sizeof(struct in_addr), 0);
 		} else if (inet_pton(AF_INET6, ai->our_ip, &in6) != 0) {
-			rc_avpair_add(rh, send, PW_NAS_IPV6_ADDRESS, (char*)&in6, sizeof(struct in6_addr), 0);
+			rc_avpair_add(rh, send, PW_NAS_IPV6_ADDRESS,
+				      (char *)&in6, sizeof(struct in6_addr), 0);
 		}
 	}
 
@@ -139,9 +145,11 @@ static void append_acct_standard(struct radius_vhost_ctx *vctx, rc_handle *rh, c
 
 	if (ai->ipv4[0] != 0) {
 		struct in_addr in;
+
 		if (inet_pton(AF_INET, ai->ipv4, &in) == 1) {
 			in.s_addr = ntohl(in.s_addr);
-			if (rc_avpair_add(rh, send, PW_FRAMED_IP_ADDRESS, &in, sizeof(in), 0) == NULL) {
+			if (rc_avpair_add(rh, send, PW_FRAMED_IP_ADDRESS, &in,
+					  sizeof(in), 0) == NULL) {
 				return;
 			}
 		}
@@ -150,8 +158,10 @@ static void append_acct_standard(struct radius_vhost_ctx *vctx, rc_handle *rh, c
 #ifndef LEGACY_RADIUS /* bug in freeradius-client */
 	if (ai->ipv6[0] != 0) {
 		struct in6_addr in;
+
 		if (inet_pton(AF_INET6, ai->ipv6, &in) == 1) {
-			if (rc_avpair_add(rh, send, PW_FRAMED_IPV6_ADDRESS, &in, sizeof(in), 0) == NULL) {
+			if (rc_avpair_add(rh, send, PW_FRAMED_IPV6_ADDRESS, &in,
+					  sizeof(in), 0) == NULL) {
 				return;
 			}
 		}
@@ -163,11 +173,11 @@ static void append_acct_standard(struct radius_vhost_ctx *vctx, rc_handle *rh, c
 
 	i = PW_RADIUS;
 	rc_avpair_add(rh, send, PW_ACCT_AUTHENTIC, &i, -1, 0);
-
-	return;
 }
 
-static void radius_acct_session_stats(void *_vctx, unsigned auth_method, const common_acct_info_st *ai, stats_st *stats)
+static void radius_acct_session_stats(void *_vctx, unsigned int auth_method,
+				      const common_acct_info_st *ai,
+				      stats_st *stats)
 {
 	int ret;
 	uint32_t status_type;
@@ -176,9 +186,10 @@ static void radius_acct_session_stats(void *_vctx, unsigned auth_method, const c
 
 	status_type = PW_STATUS_ALIVE;
 
-	syslog(LOG_DEBUG, "radius-auth: sending session interim update");
+	oc_syslog(LOG_DEBUG, "radius-auth: sending session interim update");
 
-	if (rc_avpair_add(vctx->rh, &send, PW_ACCT_STATUS_TYPE, &status_type, -1, 0) == NULL) {
+	if (rc_avpair_add(vctx->rh, &send, PW_ACCT_STATUS_TYPE, &status_type,
+			  -1, 0) == NULL) {
 		goto cleanup;
 	}
 
@@ -191,16 +202,18 @@ static void radius_acct_session_stats(void *_vctx, unsigned auth_method, const c
 		rc_avpair_free(recvd);
 
 	if (ret != OK_RC) {
-		syslog(LOG_NOTICE, "radius-auth: radius_open_session: %d", ret);
+		oc_syslog(LOG_NOTICE, "radius-auth: radius_open_session: %d",
+			  ret);
 		goto cleanup;
 	}
 
- cleanup:
+cleanup:
 	rc_avpair_free(send);
-	return;
 }
 
-static int radius_acct_open_session(void *_vctx, unsigned auth_method, const common_acct_info_st *ai, const void *sid, unsigned sid_size)
+static int radius_acct_open_session(void *_vctx, unsigned int auth_method,
+				    const common_acct_info_st *ai,
+				    const void *sid, unsigned int sid_size)
 {
 	int ret;
 	uint32_t status_type;
@@ -210,19 +223,21 @@ static int radius_acct_open_session(void *_vctx, unsigned auth_method, const com
 	status_type = PW_STATUS_START;
 
 	if (sid_size != SID_SIZE) {
-		syslog(LOG_DEBUG, "radius-auth: incorrect sid size");
+		oc_syslog(LOG_DEBUG, "radius-auth: incorrect sid size");
 		return -1;
 	}
 
-	syslog(LOG_DEBUG, "radius-auth: opening session %s", ai->safe_id);
+	oc_syslog(LOG_DEBUG, "radius-auth: opening session %s", ai->safe_id);
 
-	if (rc_avpair_add(vctx->rh, &send, PW_ACCT_STATUS_TYPE, &status_type, -1, 0) == NULL) {
+	if (rc_avpair_add(vctx->rh, &send, PW_ACCT_STATUS_TYPE, &status_type,
+			  -1, 0) == NULL) {
 		ret = -1;
 		goto cleanup;
 	}
 
 	if (ai->user_agent[0] != 0) {
-		rc_avpair_add(vctx->rh, &send, PW_CONNECT_INFO, ai->user_agent, -1, 0);
+		rc_avpair_add(vctx->rh, &send, PW_CONNECT_INFO, ai->user_agent,
+			      -1, 0);
 	}
 
 	append_acct_standard(vctx, vctx->rh, ai, &send);
@@ -233,18 +248,22 @@ static int radius_acct_open_session(void *_vctx, unsigned auth_method, const com
 		rc_avpair_free(recvd);
 
 	if (ret != OK_RC) {
-		syslog(LOG_NOTICE, "radius-auth: radius_open_session: %d", ret);
+		oc_syslog(LOG_NOTICE, "radius-auth: radius_open_session: %d",
+			  ret);
 		ret = -1;
 		goto cleanup;
 	}
 
 	ret = 0;
- cleanup:
+cleanup:
 	rc_avpair_free(send);
 	return ret;
 }
 
-static void radius_acct_close_session(void *_vctx, unsigned auth_method, const common_acct_info_st *ai, stats_st *stats, unsigned discon_reason)
+static void radius_acct_close_session(void *_vctx, unsigned int auth_method,
+				      const common_acct_info_st *ai,
+				      stats_st *stats,
+				      unsigned int discon_reason)
 {
 	int ret;
 	uint32_t status_type;
@@ -253,8 +272,9 @@ static void radius_acct_close_session(void *_vctx, unsigned auth_method, const c
 
 	status_type = PW_STATUS_STOP;
 
-	syslog(LOG_DEBUG, "radius-auth: closing session");
-	if (rc_avpair_add(vctx->rh, &send, PW_ACCT_STATUS_TYPE, &status_type, -1, 0) == NULL)
+	oc_syslog(LOG_DEBUG, "radius-auth: closing session");
+	if (rc_avpair_add(vctx->rh, &send, PW_ACCT_STATUS_TYPE, &status_type,
+			  -1, 0) == NULL)
 		return;
 
 	if (discon_reason == REASON_USER_DISCONNECT)
@@ -281,13 +301,13 @@ static void radius_acct_close_session(void *_vctx, unsigned auth_method, const c
 		rc_avpair_free(recvd);
 
 	if (ret != OK_RC) {
-		syslog(LOG_INFO, "radius-auth: radius_close_session: %d", ret);
+		oc_syslog(LOG_INFO, "radius-auth: radius_close_session: %d",
+			  ret);
 		goto cleanup;
 	}
 
- cleanup:
- 	rc_avpair_free(send);
-	return;
+cleanup:
+	rc_avpair_free(send);
 }
 
 const struct acct_mod_st radius_acct_funcs = {

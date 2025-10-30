@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include "log.h"
 
 #if defined(ENABLE_ADAPTIVE_RATE_LIMIT_SUPPORT)
 
@@ -32,37 +33,27 @@
 #include <linux/sock_diag.h>
 #include <linux/unix_diag.h>
 #include <netinet/tcp.h>
-#include <sys/syslog.h>
 
 static int send_query(int fd, int inode, int states, int show)
 {
 	int err;
-	struct sockaddr_nl nladdr = {
-		.nl_family = AF_NETLINK
-	};
+	struct sockaddr_nl nladdr = { .nl_family = AF_NETLINK };
 	struct {
 		struct nlmsghdr nlh;
 		struct unix_diag_req udr;
-	} req = {
-		.nlh = {
-			.nlmsg_len = sizeof(req),.nlmsg_type =
-			SOCK_DIAG_BY_FAMILY,.nlmsg_flags =
-			NLM_F_REQUEST | (inode ? 0 : NLM_F_DUMP)
-			}
-		,.udr = {
-			 .sdiag_family = AF_UNIX,.udiag_states =
-			 states,.udiag_show = show,.udiag_ino = inode}
-	};
-	struct iovec iov = {
-		.iov_base = &req,
-		.iov_len = sizeof(req)
-	};
-	struct msghdr msg = {
-		.msg_name = (void *)&nladdr,
-		.msg_namelen = sizeof(nladdr),
-		.msg_iov = &iov,
-		.msg_iovlen = 1
-	};
+	} req = { .nlh = { .nlmsg_len = sizeof(req),
+			   .nlmsg_type = SOCK_DIAG_BY_FAMILY,
+			   .nlmsg_flags = NLM_F_REQUEST |
+					  (inode ? 0 : NLM_F_DUMP) },
+		  .udr = { .sdiag_family = AF_UNIX,
+			   .udiag_states = states,
+			   .udiag_show = show,
+			   .udiag_ino = inode } };
+	struct iovec iov = { .iov_base = &req, .iov_len = sizeof(req) };
+	struct msghdr msg = { .msg_name = (void *)&nladdr,
+			      .msg_namelen = sizeof(nladdr),
+			      .msg_iov = &iov,
+			      .msg_iovlen = 1 };
 
 	for (;;) {
 		if (sendmsg(fd, &msg, 0) < 0) {
@@ -70,7 +61,7 @@ static int send_query(int fd, int inode, int states, int show)
 				continue;
 			err = errno;
 
-			syslog(LOG_ERR, "sendmsg failed %s", strerror(err));
+			oc_syslog(LOG_ERR, "sendmsg failed %s", strerror(err));
 			return -1;
 		}
 
@@ -78,7 +69,7 @@ static int send_query(int fd, int inode, int states, int show)
 	}
 }
 
-typedef int (*process_response)(const struct unix_diag_msg * diag,
+typedef int (*process_response)(const struct unix_diag_msg *diag,
 				unsigned int len, void *context);
 
 struct match_name_context {
@@ -95,12 +86,12 @@ static int match_name(const struct unix_diag_msg *diag, unsigned int len,
 	struct rtattr *attr;
 	unsigned int rta_len = len - NLMSG_LENGTH(sizeof(*diag));
 	size_t path_len = 0;
-	char path[sizeof(((struct sockaddr_un *) 0)->sun_path) + 1];
+	char path[sizeof(((struct sockaddr_un *)0)->sun_path) + 1];
 	struct unix_diag_rqlen rqlen;
 	int rqlen_valid = 0;
 
-	for (attr = (struct rtattr *)(diag + 1);
-	     RTA_OK(attr, rta_len); attr = RTA_NEXT(attr, rta_len)) {
+	for (attr = (struct rtattr *)(diag + 1); RTA_OK(attr, rta_len);
+	     attr = RTA_NEXT(attr, rta_len)) {
 		switch (attr->rta_type) {
 		case UNIX_DIAG_NAME:
 			if (!path_len) {
@@ -121,12 +112,12 @@ static int match_name(const struct unix_diag_msg *diag, unsigned int len,
 	}
 
 	if (path_len == 0) {
-		syslog(LOG_ERR, "UNIX_DIAG_NAME not present in response");
+		oc_syslog(LOG_ERR, "UNIX_DIAG_NAME not present in response");
 		return -1;
 	}
 
 	if (rqlen_valid == 0) {
-		syslog(LOG_ERR, "UNIX_DIAG_RQLEN not present in response");
+		oc_syslog(LOG_ERR, "UNIX_DIAG_RQLEN not present in response");
 		return -1;
 	}
 
@@ -142,22 +133,15 @@ static int receive_responses(int fd, process_response process, void *context)
 {
 	int err;
 	long buf[8192 / sizeof(long)];
-	struct sockaddr_nl nladdr = {
-		.nl_family = AF_NETLINK
-	};
-	struct iovec iov = {
-		.iov_base = buf,
-		.iov_len = sizeof(buf)
-	};
+	struct sockaddr_nl nladdr = { .nl_family = AF_NETLINK };
+	struct iovec iov = { .iov_base = buf, .iov_len = sizeof(buf) };
 	int flags = 0;
 
 	for (;;) {
-		struct msghdr msg = {
-			.msg_name = (void *)&nladdr,
-			.msg_namelen = sizeof(nladdr),
-			.msg_iov = &iov,
-			.msg_iovlen = 1
-		};
+		struct msghdr msg = { .msg_name = (void *)&nladdr,
+				      .msg_namelen = sizeof(nladdr),
+				      .msg_iov = &iov,
+				      .msg_iovlen = 1 };
 
 		ssize_t ret = recvmsg(fd, &msg, flags);
 
@@ -165,19 +149,19 @@ static int receive_responses(int fd, process_response process, void *context)
 			if (errno == EINTR)
 				continue;
 			err = errno;
-			syslog(LOG_ERR, "recvmsg failed %s", strerror(err));
+			oc_syslog(LOG_ERR, "recvmsg failed %s", strerror(err));
 			return -1;
 		}
 
 		if (ret == 0) {
-			syslog(LOG_ERR, "recvmsg returned empty response");
+			oc_syslog(LOG_ERR, "recvmsg returned empty response");
 			return -1;
 		}
 
 		const struct nlmsghdr *h = (struct nlmsghdr *)buf;
 
 		if (!NLMSG_OK(h, ret)) {
-			syslog(LOG_ERR, "!NLMSG_OK");
+			oc_syslog(LOG_ERR, "!NLMSG_OK");
 			return -1;
 		}
 
@@ -191,35 +175,38 @@ static int receive_responses(int fd, process_response process, void *context)
 				const struct nlmsgerr *err = NLMSG_DATA(h);
 
 				if (h->nlmsg_len < NLMSG_LENGTH(sizeof(*err))) {
-					syslog(LOG_ERR,
-					       "nlmsg_type NLMSG_ERROR has short nlmsg_len %d",
-					       h->nlmsg_len);
+					oc_syslog(
+						LOG_ERR,
+						"nlmsg_type NLMSG_ERROR has short nlmsg_len %d",
+						h->nlmsg_len);
 				} else {
-					syslog(LOG_ERR, "NLM query failed %s",
-					       strerror(-err->error));
+					oc_syslog(LOG_ERR,
+						  "NLM query failed %s",
+						  strerror(-err->error));
 				}
 
 				return -1;
 			}
 
 			if (h->nlmsg_type != SOCK_DIAG_BY_FAMILY) {
-				syslog(LOG_ERR, "unexpected nlmsg_type %u\n",
-				       (unsigned)h->nlmsg_type);
+				oc_syslog(LOG_ERR, "unexpected nlmsg_type %u\n",
+					  (unsigned int)h->nlmsg_type);
 				return -1;
 			}
 
 			diag = (const struct unix_diag_msg *)NLMSG_DATA(h);
 
 			if (h->nlmsg_len < NLMSG_LENGTH(sizeof(*diag))) {
-				syslog(LOG_ERR,
-				       "nlmsg_type SOCK_DIAG_BY_FAMILY has short nlmsg_len %d",
-				       h->nlmsg_len);
+				oc_syslog(
+					LOG_ERR,
+					"nlmsg_type SOCK_DIAG_BY_FAMILY has short nlmsg_len %d",
+					h->nlmsg_len);
 				return -1;
 			}
 
 			if (diag->udiag_family != AF_UNIX) {
-				syslog(LOG_ERR, "unexpected family %u\n",
-				       diag->udiag_family);
+				oc_syslog(LOG_ERR, "unexpected family %u\n",
+					  diag->udiag_family);
 				return -1;
 			}
 
@@ -235,21 +222,18 @@ int sockdiag_query_unix_domain_socket_queue_length(const char *socket_name,
 {
 	int err;
 	int ret = -1;
-	struct match_name_context ctx = {
-		.name = socket_name,
-		.inode = 0
-	};
+	struct match_name_context ctx = { .name = socket_name, .inode = 0 };
 
 	int fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_SOCK_DIAG);
 
 	if (fd < 0) {
 		err = errno;
-		syslog(LOG_ERR, "socket failed %s", strerror(err));
+		oc_syslog(LOG_ERR, "socket failed %s", strerror(err));
 		goto cleanup;
 	}
 
-	if (send_query
-	    (fd, 0, 1 << TCP_LISTEN, UDIAG_SHOW_NAME | UDIAG_SHOW_RQLEN))
+	if (send_query(fd, 0, 1 << TCP_LISTEN,
+		       UDIAG_SHOW_NAME | UDIAG_SHOW_RQLEN))
 		goto cleanup;
 
 	if (receive_responses(fd, match_name, &ctx))
@@ -260,7 +244,7 @@ int sockdiag_query_unix_domain_socket_queue_length(const char *socket_name,
 
 	ret = 0;
 
- cleanup:
+cleanup:
 	if (fd >= 0) {
 		close(fd);
 	}

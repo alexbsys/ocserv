@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#define _GNU_SOURCE
+#include <config.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,7 +30,7 @@ static char *myfunc(void *pool, const char *str)
 }
 
 #define STR1 "hi there people. How are you?"
-int main()
+int main(void)
 {
 	str_st str;
 	str_rep_tab tab[16];
@@ -47,8 +47,8 @@ int main()
 		exit(1);
 	}
 
-	if (str.length != sizeof(STR1)-1 ||
-	    strncmp((char*)str.data, STR1, sizeof(STR1)-1) != 0) {
+	if (str.length != sizeof(STR1) - 1 ||
+	    strncmp((char *)str.data, STR1, sizeof(STR1) - 1) != 0) {
 		fprintf(stderr, "error in %d\n", __LINE__);
 		exit(1);
 	}
@@ -64,9 +64,13 @@ int main()
 	STR_TAB_TERM(7);
 
 	/* check proper operation */
-#define STR2 "This is one route1, and one route2, while a route3 was replaced by dev1 and dev2 and dev1. That's all u1."
+#define STR2 \
+	"This is one route1, and one route2, while a route3 was replaced by dev1 and dev2 and dev1. That's all u1."
 	str_reset(&str);
-	if (str_append_str(&str, "This is one %R, and one %{R}, while a %{R2} was replaced by %{D} and %D and %{D}. That's all %U.") != 0) {
+	if (str_append_str(
+		    &str,
+		    "This is one %R, and one %{R}, while a %{R2} was replaced by %{D} and %D and %{D}. That's all %U.") !=
+	    0) {
 		fprintf(stderr, "error in %d\n", __LINE__);
 		exit(1);
 	}
@@ -76,12 +80,12 @@ int main()
 		exit(1);
 	}
 
-	if (str.length != sizeof(STR2)-1) {
+	if (str.length != sizeof(STR2) - 1) {
 		fprintf(stderr, "error in %d\n", __LINE__);
 		exit(1);
 	}
 
-	if (strncmp((char*)str.data, STR2, sizeof(STR2)-1) != 0) {
+	if (strncmp((char *)str.data, STR2, sizeof(STR2) - 1) != 0) {
 		fprintf(stderr, "error in %d\n", __LINE__);
 		exit(1);
 	}
@@ -104,12 +108,12 @@ int main()
 		exit(1);
 	}
 
-	if (str.length != sizeof(STR3_OUT)-1) {
+	if (str.length != sizeof(STR3_OUT) - 1) {
 		fprintf(stderr, "error in %d\n", __LINE__);
 		exit(1);
 	}
 
-	if (strncmp((char*)str.data, STR3_OUT, sizeof(STR3_OUT)-1) != 0) {
+	if (strncmp((char *)str.data, STR3_OUT, sizeof(STR3_OUT) - 1) != 0) {
 		fprintf(stderr, "error in %d\n", __LINE__);
 		exit(1);
 	}

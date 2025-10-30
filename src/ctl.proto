@@ -121,4 +121,3 @@ message unban_req
 {
 	required bytes ip = 1;
 }
-

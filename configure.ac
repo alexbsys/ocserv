@@ -1,5 +1,8 @@
 AC_PREREQ(2.61)
-AC_INIT([ocserv], [1.1.2], [openconnect-devel@lists.infradead.org])
+AC_INIT([OpenConnect VPN Server], [1.3.0],
+        [https://gitlab.com/openconnect/ocserv/-/issues],
+	[ocserv],
+	[https://ocserv.openconnect-vpn.net/])
 PKG_PROG_PKG_CONFIG
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
@@ -8,14 +11,24 @@ AM_INIT_AUTOMAKE([1.11.1 subdir-objects no-dist-gzip dist-xz -Wall -Wno-override
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 AC_CONFIG_HEADERS([config.h])
 
+AC_USE_SYSTEM_EXTENSIONS
 AC_PROG_CC
-gl_EARLY
-
+AM_PROG_CC_C_O  # Automake 1.13.4 on CentOS 7
+AC_PROG_RANLIB
 AM_PROG_AR
-AM_PROG_CC_C_O
 AC_PROG_SED
+
 if test "$GCC" = "yes" && ! expr "$CC" : clang >/dev/null 2>&1;then
 	CFLAGS="$CFLAGS -Wall -Wno-strict-aliasing -Wextra -Wno-unused-parameter -Wno-sign-compare -Wno-missing-field-initializers -Wno-implicit-fallthrough -Wno-stringop-truncation"
+fi
+
+AC_CHECK_PROGS([IPCALC], [ipcalc ipcalc-ng], [:])
+
+if test x"$IPCALC" = "x:"; then
+	AC_MSG_ERROR([[
+***
+*** ipcalc (ipcalc-ng in debian) was not found. It is needed for the test suite
+*** ]])
 fi
 
 AC_PATH_PROG(CTAGS, ctags, [:])
@@ -98,6 +111,7 @@ with_local_protobuf_c=no
  else
   AC_MSG_WARN([[***
 *** libprotobuf-c was not found.
+*** An included version of the library will be used.
 ***]])
  fi
 ]
@@ -146,12 +160,6 @@ AC_ARG_WITH(tun-tests,
 
 AM_CONDITIONAL(ENABLE_TUN_TESTS, test "x$tun_tests" = xyes)
 
-AC_ARG_WITH(nuttcp-tests,
-  AS_HELP_STRING([--without-nuttcp-tests], [disable any tests requiring nuttcp]),
-  nuttcp_tests=$withval,
-  nuttcp_tests=yes)
-AM_CONDITIONAL(ENABLE_NUTTCP_TESTS, test "x$nuttcp_tests" = xyes)
-
 AC_ARG_WITH(local-talloc,
   AS_HELP_STRING([--with-local-talloc], [use the included talloc library]),
   no_test_for_talloc=$withval,
@@ -168,6 +176,7 @@ with_local_talloc=no,
  else
   AC_MSG_WARN([[***
 *** libtalloc was not found.
+*** An included version of talloc will be used.
 ***]])
  fi
 ]
@@ -288,7 +297,7 @@ AC_LINK_IFELSE([AC_LANG_PROGRAM([
 		   AC_DEFINE([HAVE_PAM], 1, [Enable the PAM library])],
 		  [AC_MSG_RESULT(no)
    	           AC_MSG_WARN([[
-*** 
+***
 *** libpam was not found. PAM support will be disabled.
 *** ]])])
 LIBS="$oldlibs"
@@ -332,8 +341,8 @@ if test "$test_for_radius" = yes;then
 		   AC_DEFINE([LEGACY_RADIUS], 1, [Enable the legacy library support])],
 		  [AC_MSG_RESULT(no)
    	           AC_MSG_WARN([[
-*** 
-*** radcli 1.2.1 or later was not found. Radius support will be disabled.
+***
+*** radcli 1.2.5 or later was not found. Radius support will be disabled.
 *** See http://radcli.github.io/radcli/
 *** ]])])
 		LIBS="$oldlibs"
@@ -345,8 +354,6 @@ if test "$test_for_radius" = yes;then
 fi
 
 AM_CONDITIONAL(RADIUS_ENABLED, test "$radius_enabled" != no)
-
-gl_INIT
 
 AC_CHECK_HEADERS([net/if_tun.h linux/if_tun.h netinet/in_systm.h crypt.h], [], [], [])
 
@@ -458,34 +465,34 @@ else
 	AC_DEFINE_UNQUOTED([OCCTL_PAGER], ["$occtl_pager"], [The default pager for occtl])
 fi
 
-AC_ARG_WITH(http-parser,
-  AS_HELP_STRING([--without-http-parser], [use the included http parser]),
-  test_for_http_parser=$withval,
-  test_for_http_parser=yes)
+AC_ARG_WITH(llhttp,
+  AS_HELP_STRING([--without-llhttp], [use the included llhttp]),
+  test_for_llhttp=$withval,
+  test_for_llhttp=yes)
 
-dnl Test for http_parser library
-with_local_http_parser=yes
+dnl Test for llhttp library
+with_local_llhttp=yes
 
-if test "$test_for_http_parser" = yes;then
+if test "$test_for_llhttp" = yes;then
 oldlibs=$LIBS
-LIBS="$oldlibs -lhttp_parser"
-AC_MSG_CHECKING([for http_parser library])
+LIBS="$oldlibs -lllhttp"
+AC_MSG_CHECKING([for llhttp library])
 AC_LINK_IFELSE([AC_LANG_PROGRAM([
-		   #include <http_parser.h>],[
-		   http_parser_init(0, 0);])],
+		   #include <llhttp.h>],[
+		   llhttp_settings_init(0);])],
 		  [AC_MSG_RESULT(yes)
-		   AC_SUBST([HTTP_PARSER_LIBS], [-lhttp_parser])
-		   AC_SUBST([HTTP_PARSER_CFLAGS], [])
-		   with_local_http_parser=no],
+		   AC_SUBST([LLHTTP_LIBS], [-lllhttp])
+		   AC_SUBST([LLHTTP_CFLAGS], [])
+		   with_local_llhttp=no],
 		  [AC_MSG_RESULT(no)
   	           AC_MSG_WARN([[
-*** 
-*** libhttp-parser not found.
+***
+*** libllhttp not found.
 *** An included version of the library will be used.
 *** ]])])
 LIBS="$oldlibs"
 fi
-AM_CONDITIONAL(LOCAL_HTTP_PARSER, test "x$with_local_http_parser" != xno)
+AM_CONDITIONAL(LOCAL_LLHTTP, test "x$with_local_llhttp" != xno)
 
 dnl compression
 AC_ARG_ENABLE(compression,
@@ -609,7 +616,7 @@ AC_LINK_IFELSE([AC_LANG_PROGRAM([
 		   with_local_pcl=no],
 		  [AC_MSG_RESULT(no)
   	           AC_MSG_WARN([[
-*** 
+***
 *** libpcl (portable co-routines) was not found.
 *** An included version of the library will be used.
 *** ]])])
@@ -676,18 +683,26 @@ gid=$(id -g)
 AC_SUBST([ROOTUID], [$uid])
 AC_SUBST([ROOTGID], [$gid])
 
+if test -f /usr/lib64/freeradius/rlm_pam.so;then
+radius_libdir=/usr/lib64
+else
+radius_libdir=/usr/lib
+fi
+AC_SUBST([RADIUS_LIBDIR], [$radius_libdir])
+
 AC_CONFIG_FILES([
 	Makefile
 	src/version.inc
 	src/Makefile
 	doc/Makefile
-	gl/Makefile
 	tests/data/pam/ocserv
 	tests/data/pam/nss-passwd
 	tests/data/pam/nss-group
+	tests/data/raddb/radiusd.conf
 	tests/Makefile
 ])
 AC_OUTPUT
+chmod 640 tests/data/raddb/radiusd.conf
 
 AC_MSG_NOTICE([
 Summary of build options:
@@ -699,7 +714,7 @@ Summary of build options:
   CWrap testing:        ${have_cwrap}
   CWrap PAM testing:    ${have_cwrap_pam}
   CWrap NSS testing:    ${have_cwrap_nss}
-  
+
   PAM auth backend:     ${pam_enabled}
   Radius auth backend:  ${radius_enabled}
   GSSAPI auth backend:  ${enable_gssapi}
@@ -721,7 +736,7 @@ Summary of build options:
   local talloc:         ${with_local_talloc}
   local protobuf-c:     ${with_local_protobuf_c}
   local PCL library:    ${with_local_pcl}
-  local http-parser:    ${with_local_http_parser}
+  local llhttp:         ${with_local_llhttp}
   seccomp trap:		${use_seccomp_trap}
   capture latency stats ${have_latency_stats}
 ])
@@ -741,5 +756,3 @@ if test "x${isolation}" = xnone;then
 *** will not be isolated. Only seccomp is supported (see src/worker-privs.c)
 *** ]])
 fi
-
-

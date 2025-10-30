@@ -20,22 +20,28 @@
  */
 
 #include <config.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <system.h>
-#include <c-ctype.h>
+#include <ctype.h>
+#include <locale.h>
 #include <occtl/occtl.h>
-#include <c-strcase.h>
 
-static int handle_reset_cmd(CONN_TYPE * conn, const char *arg, cmd_params_st *params);
-static int handle_help_cmd(CONN_TYPE * conn, const char *arg, cmd_params_st *params);
-static int handle_exit_cmd(CONN_TYPE * conn, const char *arg, cmd_params_st *params);
+int syslog_open;
+
+static int handle_reset_cmd(CONN_TYPE *conn, const char *arg,
+			    cmd_params_st *params);
+static int handle_help_cmd(CONN_TYPE *conn, const char *arg,
+			   cmd_params_st *params);
+static int handle_exit_cmd(CONN_TYPE *conn, const char *arg,
+			   cmd_params_st *params);
 
 typedef struct {
 	char *name;
-	unsigned name_size;
+	unsigned int name_size;
 	char *arg;
 	cmd_func func;
 	char *doc;
@@ -44,15 +50,15 @@ typedef struct {
 } commands_st;
 
 #define ENTRY(name, arg, func, doc, show, npc) \
-	{name, sizeof(name)-1, arg, func, doc, show, npc}
+	{ name, sizeof(name) - 1, arg, func, doc, show, npc }
 
 static const commands_st commands[] = {
 	ENTRY("disconnect user", "[NAME]", handle_disconnect_user_cmd,
 	      "Disconnect the specified user", 1, 1),
 	ENTRY("disconnect id", "[ID]", handle_disconnect_id_cmd,
 	      "Disconnect the specified ID", 1, 1),
-	ENTRY("unban ip", "[IP]", handle_unban_ip_cmd,
-	      "Unban the specified IP", 1, 1),
+	ENTRY("unban ip", "[IP]", handle_unban_ip_cmd, "Unban the specified IP",
+	      1, 1),
 	ENTRY("reload", NULL, handle_reload_cmd,
 	      "Reloads the server configuration", 1, 1),
 	ENTRY("show status", NULL, handle_status_cmd,
@@ -77,8 +83,7 @@ static const commands_st commands[] = {
 	      "Prints information on the specified ID", 1, 1),
 	ENTRY("show events", NULL, handle_events_cmd,
 	      "Provides information about connecting users", 1, 1),
-	ENTRY("stop", "now", handle_stop_cmd,
-	      "Terminates the server", 1, 1),
+	ENTRY("stop", "now", handle_stop_cmd, "Terminates the server", 1, 1),
 	ENTRY("reset", NULL, handle_reset_cmd, "Resets the screen and terminal",
 	      0, 0),
 	ENTRY("help", "or ?", handle_help_cmd, "Prints this help", 0, 0),
@@ -90,10 +95,10 @@ static const commands_st commands[] = {
 	      "Alias for show sessions all", -1, 1),
 	ENTRY("show cookies valid", NULL, handle_list_valid_sessions_cmd,
 	      "Alias for show sessions valid", -1, 1),
-	{NULL, 0, NULL, NULL}
+	{ NULL, 0, NULL, NULL }
 };
 
-static void print_commands(unsigned interactive)
+static void print_commands(unsigned int interactive)
 {
 	unsigned int i;
 
@@ -118,10 +123,10 @@ static void print_commands(unsigned interactive)
 }
 
 #ifndef HAVE_ORIG_READLINE
-# define whitespace(x) c_isspace(x)
+#define whitespace(x) c_isspace(x)
 #endif
 
-unsigned need_help(const char *arg)
+unsigned int need_help(const char *arg)
 {
 	while (whitespace(*arg))
 		arg++;
@@ -132,11 +137,11 @@ unsigned need_help(const char *arg)
 	return 0;
 }
 
-unsigned check_cmd_help(const char *line)
+unsigned int check_cmd_help(const char *line)
 {
 	unsigned int i;
-	unsigned len = (line!=NULL)?strlen(line):0;
-	unsigned status = 0, tlen;
+	unsigned len = (line != NULL) ? strlen(line) : 0;
+	unsigned int status = 0, tlen;
 
 	while (len > 0 && (line[len - 1] == '?' || whitespace(line[len - 1])))
 		len--;
@@ -150,7 +155,7 @@ unsigned check_cmd_help(const char *line)
 			tlen = commands[i].name_size;
 		}
 
-		if (c_strncasecmp(commands[i].name, line, tlen) == 0) {
+		if (strncasecmp(commands[i].name, line, tlen) == 0) {
 			status = 1;
 			if (commands[i].arg)
 				printf(" %12s %s\t%16s\n", commands[i].name,
@@ -164,8 +169,7 @@ unsigned check_cmd_help(const char *line)
 	return status;
 }
 
-static
-void usage(void)
+static void usage(void)
 {
 	printf("occtl: [OPTIONS...] {COMMAND}\n\n");
 	printf("  -s --socket-file       Specify the server's occtl socket file\n");
@@ -178,18 +182,16 @@ void usage(void)
 	printf("\n");
 }
 
-static
-void version(void)
+static void version(void)
 {
-	fprintf(stderr,
-		"OpenConnect server control (occtl) version %s\n", VERSION);
+	fprintf(stderr, "OpenConnect server control (occtl) version %s\n",
+		VERSION);
 	fprintf(stderr, "Copyright (C) 2014-2017 Red Hat and others.\n");
 	fprintf(stderr,
 		"ocserv comes with ABSOLUTELY NO WARRANTY. This is free software,\n");
 	fprintf(stderr,
 		"and you are welcome to redistribute it under the conditions of the\n");
-	fprintf(stderr,
-		"GNU General Public License version 2.\n");
+	fprintf(stderr, "GNU General Public License version 2.\n");
 	fprintf(stderr, "\nFor help type ? or 'help'\n");
 	fprintf(stderr,
 		"==================================================================\n");
@@ -211,57 +213,53 @@ static char *rl_gets(char *line_read)
 	if (line_read && *line_read)
 		add_history(line_read);
 
-	return (line_read);
+	return line_read;
 }
 
-void
-bytes2human(unsigned long bytes, char* output, unsigned output_size, const char* suffix)
+void bytes2human(unsigned long bytes, char *output, unsigned int output_size,
+		 const char *suffix)
 {
-double data;
+	double data;
 
 	if (suffix == NULL)
 		suffix = "";
 
 	if (bytes > 1000 && bytes < 1000 * 1000) {
-		data = ((double) bytes) / 1000;
-		snprintf(output, output_size, "%.1f KB%s", data, suffix);
-		return;
+		data = ((double)bytes) / 1000;
+		snprintf(output, output_size, "%.1f kB%s", data, suffix);
 	} else if (bytes >= 1000 * 1000 && bytes < 1000 * 1000 * 1000) {
-		data = ((double) bytes) / (1000 * 1000);
+		data = ((double)bytes) / (1000 * 1000);
 		snprintf(output, output_size, "%.1f MB%s", data, suffix);
-		return;
 	} else if (bytes >= 1000 * 1000 * 1000) {
-		data = ((double) bytes) / (1000 * 1000 * 1000);
+		data = ((double)bytes) / (1000 * 1000 * 1000);
 		snprintf(output, output_size, "%.1f GB%s", data, suffix);
-		return;
 	} else {
 		snprintf(output, output_size, "%lu bytes%s", bytes, suffix);
-		return;
 	}
 }
 
-void
-time2human(uint64_t microseconds, char* output, unsigned output_size)
+void time2human(uint64_t microseconds, char *output, unsigned int output_size)
 {
 	if (microseconds < 1000) {
 		snprintf(output, output_size, "<1ms");
-		return;
 	} else if (microseconds < 1000000) {
-		snprintf(output, output_size, "%ldms", microseconds / 1000);
-		return;
+		snprintf(output, output_size, "%" PRIu64 "ms",
+			 microseconds / 1000);
 	} else {
-		snprintf(output, output_size, "%lds", microseconds / 1000000);
-		return;
+		snprintf(output, output_size, "%" PRIu64 "s",
+			 microseconds / 1000000);
 	}
 }
 
-static int handle_help_cmd(CONN_TYPE * conn, const char *arg, cmd_params_st *params)
+static int handle_help_cmd(CONN_TYPE *conn, const char *arg,
+			   cmd_params_st *params)
 {
 	print_commands(1);
 	return 0;
 }
 
-static int handle_reset_cmd(CONN_TYPE * conn, const char *arg, cmd_params_st *params)
+static int handle_reset_cmd(CONN_TYPE *conn, const char *arg,
+			    cmd_params_st *params)
 {
 	rl_reset_terminal(NULL);
 #ifdef HAVE_ORIG_READLINE
@@ -271,22 +269,22 @@ static int handle_reset_cmd(CONN_TYPE * conn, const char *arg, cmd_params_st *pa
 	return 0;
 }
 
-static int handle_exit_cmd(CONN_TYPE * conn, const char *arg, cmd_params_st *params)
+static int handle_exit_cmd(CONN_TYPE *conn, const char *arg,
+			   cmd_params_st *params)
 {
-	exit(0);
+	exit(EXIT_SUCCESS);
 }
 
-/* checks whether an input command of type "  list   users" maches 
+/* checks whether an input command of type "  list   users" matches
  * the given cmd (e.g., "list users"). If yes it executes func() and returns true.
  */
-static
-unsigned check_cmd(const char *cmd, const char *input,
-		   CONN_TYPE * conn, int need_preconn, cmd_func func, int *status,
-		   cmd_params_st *params)
+static unsigned int check_cmd(const char *cmd, const char *input,
+			      CONN_TYPE *conn, int need_preconn, cmd_func func,
+			      int *status, cmd_params_st *params)
 {
 	char *t, *p;
-	unsigned len, tlen;
-	unsigned i, ret = 0;
+	unsigned int len, tlen;
+	unsigned int i, ret = 0;
 	char prev;
 
 	while (whitespace(*input))
@@ -314,14 +312,15 @@ unsigned check_cmd(const char *cmd, const char *input,
 	if (len == 0)
 		goto cleanup;
 
-	if (tlen >= len && c_strncasecmp(cmd, t, len) == 0 && cmd[len] == 0) {	/* match */
+	if (tlen >= len && strncasecmp(cmd, t, len) == 0 &&
+	    cmd[len] == 0) { /* match */
 		p = t + len;
 		while (whitespace(*p))
 			p++;
 
 		if (need_preconn != 0) {
 			if (conn_prehandle(conn) < 0) {
-			 	*status = 1;
+				*status = 1;
 			} else {
 				*status = func(conn, p, params);
 			}
@@ -335,7 +334,7 @@ unsigned check_cmd(const char *cmd, const char *input,
 			conn_posthandle(conn);
 	}
 
- cleanup:
+cleanup:
 	talloc_free(t);
 
 	return ret;
@@ -345,7 +344,8 @@ char *stripwhite(char *string)
 {
 	register char *s, *t;
 
-	for (s = string; whitespace(*s); s++) ;
+	for (s = string; whitespace(*s); s++)
+		;
 
 	if (*s == 0)
 		return (s);
@@ -358,8 +358,7 @@ char *stripwhite(char *string)
 	return s;
 }
 
-static
-int handle_cmd(CONN_TYPE * conn, char *line, cmd_params_st *params)
+static int handle_cmd(CONN_TYPE *conn, char *line, cmd_params_st *params)
 {
 	char *cline;
 	unsigned int i;
@@ -374,17 +373,15 @@ int handle_cmd(CONN_TYPE * conn, char *line, cmd_params_st *params)
 		if (commands[i].name == NULL)
 			goto error;
 
-		if (check_cmd
-		    (commands[i].name, cline, conn,
-		     commands[i].need_preconn,
-		     commands[i].func,
-		     &status, params) != 0)
+		if (check_cmd(commands[i].name, cline, conn,
+			      commands[i].need_preconn, commands[i].func,
+			      &status, params) != 0)
 			break;
 	}
 
 	return status;
 
- error:
+error:
 	if (check_cmd_help(line) == 0) {
 		fprintf(stderr, "unknown command: %s\n", line);
 		fprintf(stderr,
@@ -398,9 +395,9 @@ int handle_cmd(CONN_TYPE * conn, char *line, cmd_params_st *params)
  */
 static char *merge_args(int argc, char **argv)
 {
-	unsigned size = 0;
+	unsigned int size = 0;
 	char *data, *p;
-	unsigned i, len;
+	unsigned int i, len;
 
 	for (i = 1; i < argc; i++) {
 		size += strlen(argv[i]) + 1;
@@ -410,7 +407,7 @@ static char *merge_args(int argc, char **argv)
 	data = malloc(size);
 	if (data == NULL) {
 		fprintf(stderr, "memory error\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	p = data;
@@ -427,12 +424,12 @@ static char *merge_args(int argc, char **argv)
 	return data;
 }
 
-static unsigned int cmd_start = 0;
+static unsigned int cmd_start;
 static char *command_generator(const char *text, int state)
 {
 	static int list_index, len;
 	static int entries_idx;
-	unsigned name_size;
+	unsigned int name_size;
 	char *name, *arg;
 	char *ret;
 
@@ -454,35 +451,29 @@ static char *command_generator(const char *text, int state)
 		if (cmd_start > name_size) {
 			/* check for user or ID options */
 			if (rl_line_buffer != NULL &&
-			    c_strncasecmp(rl_line_buffer, name, name_size) == 0
-			    &&
+			    strncasecmp(rl_line_buffer, name, name_size) == 0 &&
 			    /* make sure only one argument is appended */
 			    rl_line_buffer[name_size] != 0 &&
-			    strchr(&rl_line_buffer[name_size + 1],
-				   ' ') == NULL) {
-
+			    strchr(&rl_line_buffer[name_size + 1], ' ') ==
+				    NULL) {
 				if (arg != NULL) {
 					ret = NULL;
 					if (strcmp(arg, "[NAME]") == 0)
-						ret =
-						    search_for_user(entries_idx,
-								    text, len);
+						ret = search_for_user(
+							entries_idx, text, len);
 					else if (strcmp(arg, "[ID]") == 0)
-						ret =
-						    search_for_id(entries_idx,
-								  text, len);
+						ret = search_for_id(entries_idx,
+								    text, len);
 					else if (strcmp(arg, "[IP]") == 0)
-						ret =
-						    search_for_ip(entries_idx,
-								  text, len);
+						ret = search_for_ip(entries_idx,
+								    text, len);
 					else if (strcmp(arg, "[SID]") == 0)
-						ret =
-						    search_for_session(entries_idx,
-								  text, len);
+						ret = search_for_session(
+							entries_idx, text, len);
 					if (ret != NULL) {
 						entries_idx++;
 					}
-					list_index--;	/* restart at the same cmd */
+					list_index--; /* restart at the same cmd */
 					return ret;
 				}
 			}
@@ -493,13 +484,13 @@ static char *command_generator(const char *text, int state)
 		if (cmd_start > 0 && name[cmd_start - 1] != ' ')
 			continue;
 
-		if (rl_line_buffer != NULL
-		    && c_strncasecmp(rl_line_buffer, name, cmd_start) != 0)
+		if (rl_line_buffer != NULL &&
+		    strncasecmp(rl_line_buffer, name, cmd_start) != 0)
 			continue;
 
 		name += cmd_start;
-		if (c_strncasecmp(name, text, len) == 0) {
-			return (strdup(name));
+		if (strncasecmp(name, text, len) == 0) {
+			return strdup(name);
 		}
 	}
 
@@ -520,7 +511,6 @@ void handle_sigint(int signo)
 	rl_crlf();
 #endif
 	rl_redisplay();
-	return;
 }
 
 void initialize_readline(void)
@@ -535,7 +525,8 @@ void initialize_readline(void)
 	ocsignal(SIGINT, handle_sigint);
 }
 
-static int single_cmd(int argc, char **argv, void *pool, const char *file, cmd_params_st *params)
+static int single_cmd(int argc, char **argv, void *pool, const char *file,
+		      cmd_params_st *params)
 {
 	CONN_TYPE *conn;
 	char *line;
@@ -550,7 +541,6 @@ static int single_cmd(int argc, char **argv, void *pool, const char *file, cmd_p
 	return ret;
 }
 
-
 int main(int argc, char **argv)
 {
 	char *line = NULL;
@@ -560,26 +550,32 @@ int main(int argc, char **argv)
 	cmd_params_st params;
 	int ret;
 
+	/* ensure our string comparisons do not take into account any system
+	 * locale. We compare strings that come through our configuration or
+	 * network. */
+	setlocale(LC_CTYPE, "C");
+	setlocale(LC_COLLATE, "C");
+
 	memset(&params, 0, sizeof(params));
 
 	gl_pool = talloc_init("occtl");
 	if (gl_pool == NULL) {
 		fprintf(stderr, "talloc init error\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	ocsignal(SIGPIPE, SIG_IGN);
 
 	if (argc > 1) {
 		while (argc > 1 && argv[1][0] == '-') {
-			if (argv[1][1] == 'j'
-			    || (argv[1][1] == '-' && argv[1][2] == 'j')) {
+			if (argv[1][1] == 'j' ||
+			    (argv[1][1] == '-' && argv[1][2] == 'j')) {
 				params.json = 1;
 
 				argv += 1;
 				argc -= 1;
-			} else if (argv[1][1] == 'n'
-			    || (argv[1][1] == '-' && argv[1][2] == 'n')) {
+			} else if (argv[1][1] == 'n' ||
+				   (argv[1][1] == '-' && argv[1][2] == 'n')) {
 				params.no_pager = 1;
 
 				argv += 1;
@@ -594,12 +590,13 @@ int main(int argc, char **argv)
 					params.json = 0;
 					goto interactive;
 				}
-			} else if (argv[1][1] == 'v'
-			    || (argv[1][1] == '-' && argv[1][2] == 'v')) {
+			} else if (argv[1][1] == 'v' ||
+				   (argv[1][1] == '-' && argv[1][2] == 'v')) {
 				version();
-				exit(0);
-			} else if (argc > 2 && (argv[1][1] == 's'
-			    || (argv[1][1] == '-' && argv[1][2] == 's'))) {
+				exit(EXIT_SUCCESS);
+			} else if (argc > 2 &&
+				   (argv[1][1] == 's' ||
+				    (argv[1][1] == '-' && argv[1][2] == 's'))) {
 				file = talloc_strdup(gl_pool, argv[2]);
 
 				if (argc == 3) {
@@ -611,17 +608,17 @@ int main(int argc, char **argv)
 				argc -= 2;
 			} else {
 				usage();
-				exit(0);
+				exit(EXIT_SUCCESS);
 			}
-  		}
+		}
 
-  		/* handle all arguments as a command */
+		/* handle all arguments as a command */
 		ret = single_cmd(argc, argv, gl_pool, file, &params);
 		talloc_free(gl_pool);
 		exit(ret);
 	}
 
- interactive:
+interactive:
 	conn = conn_init(gl_pool, file);
 
 	initialize_readline();

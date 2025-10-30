@@ -23,7 +23,9 @@
 #include "../src/ip-util.h"
 #include "../src/ip-util.c"
 
-int main()
+int syslog_open;
+
+int main(void)
 {
 	char *p;
 

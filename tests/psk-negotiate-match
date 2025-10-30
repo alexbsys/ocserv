@@ -26,4 +26,3 @@ TEST_CONFIG="test-psk-negotiate.config"
 MATCH_CIPHERS=true
 
 . cipher-common.sh
-

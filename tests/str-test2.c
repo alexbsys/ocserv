@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#define _GNU_SOURCE
+#include <config.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,24 +25,24 @@
 #include "../src/str.c"
 
 #define STR1 "  hi there people. How are you?"
-int main()
+int main(void)
 {
 	char str[64];
 
-	strcpy(str, STR1"     ");
+	strcpy(str, STR1 "     ");
 
 	trim_trailing_whitespace(str);
 
-	if (strncmp(str, STR1, sizeof(STR1)-1) != 0) {
+	if (strncmp(str, STR1, sizeof(STR1) - 1) != 0) {
 		fprintf(stderr, "error in %d\n", __LINE__);
 		exit(1);
 	}
 
-	strcpy(str, STR1" ");
+	strcpy(str, STR1 " ");
 
 	trim_trailing_whitespace(str);
 
-	if (strncmp(str, STR1, sizeof(STR1)-1) != 0) {
+	if (strncmp(str, STR1, sizeof(STR1) - 1) != 0) {
 		fprintf(stderr, "error in %d\n", __LINE__);
 		exit(1);
 	}
@@ -51,16 +51,16 @@ int main()
 
 	trim_trailing_whitespace(str);
 
-	if (strncmp(str, STR1, sizeof(STR1)-1) != 0) {
+	if (strncmp(str, STR1, sizeof(STR1) - 1) != 0) {
 		fprintf(stderr, "error in %d\n", __LINE__);
 		exit(1);
 	}
 
-	strcpy(str, "  "STR1);
+	strcpy(str, "  " STR1);
 
 	trim_trailing_whitespace(str);
 
-	if (strncmp(str, "  "STR1, sizeof("  "STR1)-1) != 0) {
+	if (strncmp(str, "  " STR1, sizeof("  " STR1) - 1) != 0) {
 		fprintf(stderr, "error in %d\n", __LINE__);
 		exit(1);
 	}
@@ -69,7 +69,7 @@ int main()
 
 	trim_trailing_whitespace(str);
 
-	if (strncmp(str, "", sizeof("")-1) != 0) {
+	if (strncmp(str, "", sizeof("") - 1) != 0) {
 		fprintf(stderr, "error in %d\n", __LINE__);
 		exit(1);
 	}

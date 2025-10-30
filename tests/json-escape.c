@@ -25,9 +25,10 @@
 #include <netdb.h>
 #include "../src/occtl/json.h"
 #include "../src/occtl/json.c"
+#include "../src/common/common.h"
 
-static char *strings[] = 
-{
+static char *strings[] = {
+
 	"hello there",
 	"hi bro\n",
 	"small ascii\x10\x01\x03\x04\x18\x20\x21\x1f end",
@@ -36,8 +37,8 @@ static char *strings[] =
 	"\tbig pile  \b\b of stuff\r\n"
 };
 
-static char *encoded_strings[] = 
-{
+static char *encoded_strings[] = {
+
 	"hello there",
 	"hi bro\\u000a",
 	"small ascii\\u0010\\u0001\\u0003\\u0004\\u0018 !\\u001f end",
@@ -46,17 +47,19 @@ static char *encoded_strings[] =
 	"\\u0009big pile  \\u0008\\u0008 of stuff\\u000d\\u000a"
 };
 
-int main()
+int main(void)
 {
 	char tmp[512];
 	char *p;
-	unsigned i;
+	unsigned int i;
 
-	for (i=0;i<sizeof(strings)/sizeof(strings[0]);i++) {
+	for (i = 0; i < ARRAY_SIZE(strings); i++) {
 		tmp[0] = 0;
 		p = json_escape_val(tmp, sizeof(tmp), strings[i]);
 		if (strcmp(p, encoded_strings[i]) != 0) {
-			fprintf(stderr, "string %d, fails encoding:\n\tinput: '%s'\n\toutput: '%s'\n", i, strings[i], p);
+			fprintf(stderr,
+				"string %d, fails encoding:\n\tinput: '%s'\n\toutput: '%s'\n",
+				i, strings[i], p);
 			exit(1);
 		}
 	}

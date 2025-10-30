@@ -3,7 +3,7 @@
 # Copyright (C) 2011-2013 Free Software Foundation, Inc.
 # Copyright 2013 Nikos Mavrogiannopoulos
 #
-# This file is part of GnuTLS.
+# This file is part of ocserv.
 #
 # The launch_server() function was contributed by Cedric Arbogast.
 #
@@ -269,4 +269,4 @@ GETPORT='
     done
 '
 
-trap "fail \"Failed to launch the server, aborting test... \"" 10 
+trap "fail \"Failed to launch the server, aborting test... \"" 10

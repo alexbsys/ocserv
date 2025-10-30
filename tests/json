@@ -56,15 +56,10 @@ function finish {
 trap finish EXIT
 
 # server address
-ADDRESS=10.210.2.1
-CLI_ADDRESS=10.210.1.1
-VPNNET=192.168.1.0/24
-VPNADDR=192.168.1.1
-VPNNET6=fd91:6d97:7341:db6a::/112
-VPNADDR6=fd91:6d97:7341:db6a::1
 OCCTL_SOCKET=./occtl-json-$$.socket
 USERNAME=test
 
+. `dirname $0`/random-net.sh
 . `dirname $0`/ns.sh
 
 # Run servers
@@ -78,7 +73,7 @@ ${CMDNS2} ${SERV} -p ${PIDFILE} -f -c ${CONFIG} ${DEBUG} & PID=$!
 sleep 4
 
 echo " * Connecting to ${ADDRESS}:${PORT}..."
-( echo "test" | ${CMDNS1} ${OPENCONNECT} ${ADDRESS}:${PORT} -u ${USERNAME} --servercert=d66b507ae074d03b02eafca40d35f87dd81049d3 -s ${srcdir}/scripts/vpnc-script --pid-file=${CLIPID} --passwd-on-stdin -b )
+( echo "test" | ${CMDNS1} ${OPENCONNECT} ${ADDRESS}:${PORT} -u ${USERNAME} --servercert=pin-sha256:xp3scfzy3rOQsv9NcOve/8YVVv+pHr4qNCXEXrNl5s8= -s ${srcdir}/scripts/vpnc-script --pid-file=${CLIPID} --passwd-on-stdin -b )
 if test $? != 0;then
 	echo "Could not connect to server"
 	exit 1
@@ -103,6 +98,18 @@ if test $? != 0;then
 	exit 1
 fi
 
+${OCCTL} -s ${OCCTL_SOCKET} --json --debug show users >${OUTFILE}
+if test $? != 0;then
+	echo "occtl show users --debug failed!"
+	exit 1
+fi
+
+json_verify <${OUTFILE}
+if test $? != 0;then
+	echo "occtl show users --debug json invalid"
+	exit 1
+fi
+
 ${OCCTL} -s ${OCCTL_SOCKET} --json show user ${USERNAME} >${OUTFILE}
 if test $? != 0;then
 	echo "occtl show user failed!"
@@ -112,6 +119,18 @@ fi
 json_verify <${OUTFILE}
 if test $? != 0;then
 	echo "occtl show user json invalid"
+	exit 1
+fi
+
+${OCCTL} -s ${OCCTL_SOCKET} --json --debug show user ${USERNAME} >${OUTFILE}
+if test $? != 0;then
+	echo "occtl show user --debug failed!"
+	exit 1
+fi
+
+json_verify <${OUTFILE}
+if test $? != 0;then
+	echo "occtl show user --debug json invalid"
 	exit 1
 fi
 
@@ -127,6 +146,18 @@ if test $? != 0;then
 	exit 1
 fi
 
+${OCCTL} -s ${OCCTL_SOCKET} --json --debug show status >${OUTFILE}
+if test $? != 0;then
+	echo "occtl show status --debug failed!"
+	exit 1
+fi
+
+json_verify <${OUTFILE}
+if test $? != 0;then
+	echo "occtl show status --debug json invalid"
+	exit 1
+fi
+
 ${OCCTL} -s ${OCCTL_SOCKET} --json show session all >${OUTFILE}
 if test $? != 0;then
 	echo "occtl show session all failed!"
@@ -136,6 +167,18 @@ fi
 json_verify <${OUTFILE}
 if test $? != 0;then
 	echo "occtl show session all json invalid"
+	exit 1
+fi
+
+${OCCTL} -s ${OCCTL_SOCKET} --json --debug show session all >${OUTFILE}
+if test $? != 0;then
+	echo "occtl show session all --debug failed!"
+	exit 1
+fi
+
+json_verify <${OUTFILE}
+if test $? != 0;then
+	echo "occtl show session all --debug json invalid"
 	exit 1
 fi
 

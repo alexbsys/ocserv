@@ -6,8 +6,9 @@ Requires=ocserv.socket
 
 [Service]
 PrivateTmp=true
-PIDFile=/var/run/ocserv.pid
-ExecStart=/usr/sbin/ocserv --foreground --pid-file /var/run/ocserv.pid --config /etc/ocserv/ocserv.conf
+PIDFile=/run/ocserv.pid
+Type=simple
+ExecStart=/usr/sbin/ocserv --log-stderr --foreground --pid-file /run/ocserv.pid --config /etc/ocserv/ocserv.conf
 ExecReload=/bin/kill -HUP $MAINPID
 
 [Install]

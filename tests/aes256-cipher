@@ -24,4 +24,3 @@ CIPHER_NAME="AES256-SHA"
 GNUTLS_NAME="(DTLS0.9)-(RSA)-(AES-256-CBC)-(SHA1)"
 
 . cipher-common.sh
-

@@ -19,9 +19,11 @@ ocpasswd.8:
 else
 
 ocserv.8: ocserv.8.md sample.config
-	sed -e '/@CONFIGFILE@/{r sample.config' -e 'd}' <$< >ocserv.tmp
+	sed -e 's/^/    /' sample.config >sample.config.tmp
+	sed -e '/@CONFIGFILE@/{r sample.config.tmp' -e 'd}' <$< >ocserv.tmp
 	ronn --pipe -r ocserv.tmp > $@.tmp
 	test -s $@.tmp && mv $@.tmp $@
+	rm -f sample.config.tmp
 
 occtl.8: occtl.8.md
 	ronn --pipe -r $^ > $@.tmp

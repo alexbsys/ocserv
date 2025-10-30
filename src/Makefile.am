@@ -1,12 +1,13 @@
 include common.mk
 
-AM_CPPFLAGS += -I$(srcdir)/../gl/ -I$(builddir)/../gl/ \
+AM_CPPFLAGS += \
 	-I$(srcdir)/ -I$(builddir)/../ -I$(srcdir)/../ \
 	$(LIBGNUTLS_CFLAGS) -I$(srcdir)/common -I$(builddir)/common \
 	$(LIBPROTOBUF_C_CFLAGS) $(LIBLZ4_CFLAGS) \
 	$(LIBREADLINE_CFLAGS) $(CODE_COVERAGE_CFLAGS) \
 	$(LIBTALLOC_CFLAGS) $(LIBDBUS_CFLAGS) $(LIBOATH_CFLAGS) \
-	$(LIBKRB5_CFLAGS) $(LIBTASN1_CFLAGS) $(RADCLI_CFLAGS) $(SRC_CFLAGS)
+	$(LIBKRB5_CFLAGS) $(LIBTASN1_CFLAGS) $(RADCLI_CFLAGS) $(SRC_CFLAGS) \
+	-DOCSERV_FW_SCRIPT=\"${libexecdir}/ocserv-fw\"
 
 if ENABLE_OIDC_AUTH
 AM_CPPFLAGS += $(LIBCURL_CFLAGS) $(CJOSE_CFLAGS) $(JANSSON_CFLAGS)
@@ -18,28 +19,28 @@ BUILT_SOURCES = ipc.pb-c.c ipc.pb-c.h \
 EXTRA_DIST = version.inc.in version.inc \
 	ipc.proto ctl.proto http-heads.gperf common.mk ocserv-fw
 
-CORE_LDADD = ../gl/libgnu.a libccan.a libcommon.a
+CORE_LDADD = libccan.a libcommon.a
 CORE_LDADD += $(LIBGNUTLS_LIBS) $(PAM_LIBS) $(LIBUTIL) \
-	$(LIBSECCOMP) $(LIBWRAP) $(LIBCRYPT) $(NEEDED_HTTP_PARSER_LIBS) \
+	$(LIBSECCOMP) $(LIBWRAP) $(LIBCRYPT) $(NEEDED_LLHTTP_LIBS) \
 	$(NEEDED_LIBPROTOBUF_LIBS) $(LIBSYSTEMD) $(LIBTALLOC_LIBS) \
 	$(RADCLI_LIBS) $(LIBLZ4_LIBS) $(LIBKRB5_LIBS) \
 	$(LIBTASN1_LIBS) $(LIBOATH_LIBS) $(LIBNETTLE_LIBS) \
 	$(LIBEV_LIBS) libipc.a $(NEEDED_LIBPROTOBUF_LIBS) \
 	$(CODE_COVERAGE_LDFLAGS)
 
-if LOCAL_HTTP_PARSER
-HTTP_PARSER_SOURCES = http-parser/http_parser.c http-parser/http_parser.h
+if LOCAL_LLHTTP
+LLHTTP_SOURCES = llhttp/llhttp.c llhttp/llhttp.h llhttp/api.c llhttp/http.c
 endif
 
-CORE_SOURCES = $(HTTP_PARSER_SOURCES) \
+CORE_SOURCES = $(LLHTTP_SOURCES) \
 	common/hmac.c common/hmac.h common/snapshot.c common/snapshot.h \
 	common-config.h config.c config-kkdcp.c config-ports.c defs.h gettime.h \
-	icmp-ping.c icmp-ping.h inih/ini.c inih/ini.h ip-lease.c ip-lease.h \
-	ip-util.c ip-util.h isolate.h isolate.c log.c main.h main-ctl.h \
+	inih/ini.c inih/ini.h \
+	ip-util.c ip-util.h main.h main-ctl.h \
 	script-list.h setproctitle.c setproctitle.h str.c str.h subconfig.c \
 	sup-config/file.c sup-config/file.h sup-config/radius.c \
-	sup-config/radius.h tlslib.c tlslib.h tun.c tun.h valid-hostname.c \
-	vasprintf.c vasprintf.h vhost.h vpn.h namespace.h
+	sup-config/radius.h tlslib.c tlslib.h valid-hostname.c \
+	vasprintf.c vasprintf.h vhost.h vpn.h namespace.h worker-log.c
 
 if ENABLE_COMPRESSION
 CORE_SOURCES += lzs.c lzs.h
@@ -58,7 +59,7 @@ ACCT_SOURCES=acct/radius.c acct/radius.h acct/pam.c acct/pam.h
 
 
 sbin_PROGRAMS = ocserv ocserv-worker
-bin_SCRIPTS = ocserv-fw
+libexec_SCRIPTS = ocserv-fw
 
 ocserv_SOURCES = $(CORE_SOURCES) $(AUTH_SOURCES) $(ACCT_SOURCES) \
 	main.c main-auth.c main-ban.c main-ban.h main-ctl-unix.c main-proc.c \
@@ -66,7 +67,9 @@ ocserv_SOURCES = $(CORE_SOURCES) $(AUTH_SOURCES) $(ACCT_SOURCES) \
 	proc-search.h route-add.c route-add.h sec-mod.c sec-mod.h sec-mod-acct.h \
 	sec-mod-auth.c sec-mod-auth.h sec-mod-cookies.c sec-mod-db.c \
 	sec-mod-resume.c sec-mod-resume.h sec-mod-sup-config.c sec-mod-sup-config.h \
-	common/sockdiag.h common/sockdiag.c namespace.c
+	common/sockdiag.h common/sockdiag.c namespace.c main-log.c \
+	icmp-ping.c icmp-ping.h ip-lease.c ip-lease.h tun.c tun.h \
+	main-limits.c main-limits.h
 
 ocserv_LDADD = $(CORE_LDADD)
 
@@ -75,8 +78,8 @@ ocserv_worker_SOURCES = $(CORE_SOURCES) \
 	html.c html.h http-heads.h worker.c worker.h worker-auth.c \
 	worker-bandwidth.c worker-bandwidth.h worker-http.c worker-http-handlers.c \
 	worker-kkdcp.c worker-misc.c worker-privs.c worker-proxyproto.c \
-	worker-resume.c worker-vpn.c
-
+	worker-resume.c worker-vpn.c worker-svc.c worker-tun.c isolate.c \
+	isolate.h
 ocserv_worker_LDADD = $(CORE_LDADD)
 
 noinst_LIBRARIES = libipc.a
@@ -126,8 +129,7 @@ bin_PROGRAMS = occtl/occtl
 occtl_occtl_CPPFLAGS = $(AM_CPPFLAGS) -I$(srcdir)/occtl $(LIBNL3_CFLAGS) $(GEOIP_CFLAGS) $(MAXMIND_CFLAGS)
 occtl_occtl_SOURCES = occtl/occtl.c occtl/pager.c occtl/occtl.h occtl/time.c occtl/cache.c \
 	occtl/ip-cache.c occtl/nl.c occtl/ctl.h occtl/print.c occtl/json.c occtl/json.h \
-	occtl/hex.c occtl/hex.h occtl/unix.c occtl/geoip.h \
-	occtl/session-cache.c
+	occtl/unix.c occtl/geoip.h occtl/session-cache.c
 
 if HAVE_MAXMIND
 occtl_occtl_SOURCES += occtl/maxmind.c
@@ -135,7 +137,7 @@ else
 occtl_occtl_SOURCES += occtl/geoip.c
 endif
 
-occtl_occtl_LDADD = ../gl/libgnu.a libcommon.a $(LIBREADLINE_LIBS) \
+occtl_occtl_LDADD = libcommon.a $(LIBREADLINE_LIBS) \
 	$(LIBNL3_LIBS) $(NEEDED_LIBPROTOBUF_LIBS) $(LIBTALLOC_LIBS) libccan.a \
 	libipc.a $(NEEDED_LIBPROTOBUF_LIBS) $(CODE_COVERAGE_LDFLAGS) \
 	$(LIBNETTLE_LIBS) $(MAXMIND_LIBS) $(GEOIP_LIBS)
@@ -146,7 +148,7 @@ bin_PROGRAMS += ocpasswd/ocpasswd
 
 ocpasswd_ocpasswd_CPPFLAGS = $(AM_CPPFLAGS) -I$(srcdir)/ocpasswd
 ocpasswd_ocpasswd_SOURCES = ocpasswd/ocpasswd.c
-ocpasswd_ocpasswd_LDADD = ../gl/libgnu.a
+ocpasswd_ocpasswd_LDADD = 
 ocpasswd_ocpasswd_LDADD += $(LIBGNUTLS_LIBS) $(LIBCRYPT) $(CODE_COVERAGE_LDFLAGS) \
 	$(LIBNETTLE_LIBS)
 
@@ -155,8 +157,9 @@ ocpasswd_ocpasswd_LDADD += $(LIBGNUTLS_LIBS) $(LIBCRYPT) $(CODE_COVERAGE_LDFLAGS
 # Files common to ocserv and occtl.
 libcommon_a_CPPFLAGS = $(AM_CPPFLAGS) -I$(srcdir)/common
 libcommon_a_SOURCES=common/common.c common/common.h common/system.c common/system.h \
-	common/cloexec.c common/cloexec.h common/base64-helper.c common/base64-helper.h
-libcommon_a_LIBS = ../gl/libgnu.a $(NEEDED_LIBPROTOBUF_LIBS)
+	common/cloexec.c common/cloexec.h common/base64-helper.c common/base64-helper.h \
+	log.c log.h
+libcommon_a_LIBS = $(NEEDED_LIBPROTOBUF_LIBS)
 noinst_LIBRARIES += libcommon.a
 
 
@@ -164,11 +167,12 @@ noinst_LIBRARIES += libcommon.a
 EXTRA_DIST += ccan/licenses/BSD-MIT ccan/licenses/CC0 ccan/licenses/LGPL-2.1
 
 noinst_LIBRARIES += libccan.a
-libccan_a_CPPFLAGS = $(AM_CPPFLAGS) -I$(srcdir)/ccan
+libccan_a_CPPFLAGS = $(AM_CPPFLAGS) -I$(srcdir) -I$(srcdir)/ccan
 libccan_a_SOURCES = ccan/build_assert/build_assert.h ccan/check_type/check_type.h \
 	ccan/container_of/container_of.h ccan/hash/hash.c ccan/hash/hash.h \
 	ccan/htable/htable.c ccan/htable/htable.h ccan/htable/htable_type.h \
-	ccan/list/list.c ccan/list/list.h
+	ccan/list/list.c ccan/list/list.h \
+	ccan/str/hex/hex.c ccan/str/hex/hex.h
 
 if LOCAL_TALLOC
 libccan_a_SOURCES += ccan/talloc/talloc.c ccan/talloc/talloc.h ccan/compiler/compiler.h \

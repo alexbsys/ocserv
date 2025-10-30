@@ -37,7 +37,7 @@ wait_server $PID
 for token in data/success_*; do
     http_result=$(LD_PRELOAD=libsocket_wrapper.so curl --insecure https://$ADDRESS:$PORT --request POST --data config-auth.xml --header "Authorization:Bearer=`cat $token`" --output /dev/null --write-out "%{http_code}")
     if [ "$http_result" != "200" ]; then
-        fail $PID "Token incorrectly rejected returned $http_result"  
+        fail $PID "Token incorrectly rejected returned $http_result"
     fi
 done
 for token in data/fail_*; do
@@ -55,7 +55,7 @@ sleep 5s
 for token in data/success_*; do
     http_result=$(LD_PRELOAD=libsocket_wrapper.so curl --insecure https://$ADDRESS:$PORT --request POST --data config-auth.xml --header "Authorization:Bearer=`cat $token`" --output /dev/null --write-out "%{http_code}")
     if [ "$http_result" != "401" ]; then
-        fail $PID "Token incorrectly accepted returned $http_result"  
+        fail $PID "Token incorrectly accepted returned $http_result"
     fi
 done
 
@@ -63,7 +63,7 @@ done
 for token in data/success_*; do
     http_result=$(LD_PRELOAD=libsocket_wrapper.so curl --insecure https://$ADDRESS:$PORT --request POST --data config-auth.xml --header "Authorization:Bearer=`cat $token`" --output /dev/null --write-out "%{http_code}")
     if [ "$http_result" != "200" ]; then
-        fail $PID "Token incorrectly rejected returned $http_result"  
+        fail $PID "Token incorrectly rejected returned $http_result"
     fi
 done
 

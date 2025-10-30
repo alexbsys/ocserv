@@ -59,7 +59,7 @@
 # 2) There are two different functions to set routes: generic routes and the
 #   default route. Why isn't the defaultroute handled via the generic route case?
 # 3) In the split tunnel case, all routes but the default route might get replaced
-#   without getting restored later. We should explicitely check and save them just
+#   without getting restored later. We should explicitly check and save them just
 #   like the defaultroute
 # 4) Replies to a dhcp-server should never be sent into the tunnel
 
@@ -271,7 +271,7 @@ if [ -n "$IPROUTE" ]; then
 else # use route command
 	get_default_gw() {
 		# isn't -n supposed to give --numeric output?
-		# apperently not...
+		# apparently not...
 		# Get rid of lines containing IPv6 addresses (':')
 		netstat -r -n | awk '/:/ { next; } /^(default|0\.0\.0\.0)/ { print $2; }'
 	}

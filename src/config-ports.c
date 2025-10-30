@@ -21,17 +21,19 @@
 #include <stdlib.h>
 #include <string.h>
 #include <common-config.h>
-#include <c-strcase.h>
-#include <c-ctype.h>
+#include <ctype.h>
 #include <talloc.h>
+#include "log.h"
 
 #include <vpn.h>
 
-static int append_port(void *pool, FwPortSt ***fw_ports, size_t *n_fw_ports, int port, fw_proto_t proto, unsigned negate)
+static int append_port(void *pool, FwPortSt ***fw_ports, size_t *n_fw_ports,
+		       int port, fw_proto_t proto, unsigned int negate)
 {
 	FwPortSt *current;
 
-	*fw_ports = talloc_realloc(pool, *fw_ports, FwPortSt*, (*n_fw_ports)+1);
+	*fw_ports =
+		talloc_realloc(pool, *fw_ports, FwPortSt *, (*n_fw_ports) + 1);
 	if (*fw_ports == NULL)
 		return -1;
 
@@ -56,10 +58,11 @@ static int append_port(void *pool, FwPortSt ***fw_ports, size_t *n_fw_ports, int
 /* Parse strings of the format tcp(443), udp(111), and fill in
  * allowed_tcp_ports and allowed_udp_ports.
  */
-int cfg_parse_ports(void *pool, FwPortSt ***fw_ports, size_t *n_fw_ports, const char *str)
+int cfg_parse_ports(void *pool, FwPortSt ***fw_ports, size_t *n_fw_ports,
+		    const char *str)
 {
 	const char *p, *p2;
-	unsigned finish = 0;
+	unsigned int finish = 0;
 	int port, ret;
 	fw_proto_t proto;
 	int negate = 0, bracket_start = 0;
@@ -69,27 +72,28 @@ int cfg_parse_ports(void *pool, FwPortSt ***fw_ports, size_t *n_fw_ports, const 
 
 	p = str;
 
-	while (c_isspace(*p))
+	while (isspace(*p))
 		p++;
 
 	if (*p == '!') {
 		negate = 1;
 		p++;
-		while (c_isspace(*p) || (*p == '(')) {
+		while (isspace(*p) || (*p == '(')) {
 			if (*p == '(')
 				bracket_start = 1;
 			p++;
 		}
 
 		if (bracket_start == 0) {
-			syslog(LOG_ERR, "no bracket following negation at %d '%s'", (int)(ptrdiff_t)(p-str), str);
+			oc_syslog(LOG_ERR,
+				  "no bracket following negation at %d '%s'",
+				  (int)(ptrdiff_t)(p - str), str);
 			return -1;
 		}
 	}
 
 	do {
-
-		while (c_isspace(*p))
+		while (isspace(*p))
 			p++;
 
 		if (strncasecmp(p, "tcp", 3) == 0) {
@@ -111,46 +115,59 @@ int cfg_parse_ports(void *pool, FwPortSt ***fw_ports, size_t *n_fw_ports, const 
 			proto = PROTO_ESP;
 			p += 3;
 		} else {
-			syslog(LOG_ERR, "unknown protocol on restrict-user-to-ports at %d '%s'", (int)(ptrdiff_t)(p-str), str);
+			oc_syslog(
+				LOG_ERR,
+				"unknown protocol on restrict-user-to-ports at %d '%s'",
+				(int)(ptrdiff_t)(p - str), str);
 			return -1;
 		}
 
-		while (c_isspace(*p))
+		while (isspace(*p))
 			p++;
 
 		if (*p != '(') {
-			syslog(LOG_ERR, "expected parenthesis on restrict-user-to-ports at %d '%s'", (int)(ptrdiff_t)(p-str), str);
+			oc_syslog(
+				LOG_ERR,
+				"expected parenthesis on restrict-user-to-ports at %d '%s'",
+				(int)(ptrdiff_t)(p - str), str);
 			return -1;
 		}
 
 		p++;
 		port = atoi(p);
 
-		ret = append_port(pool, fw_ports, n_fw_ports, port, proto, negate);
+		ret = append_port(pool, fw_ports, n_fw_ports, port, proto,
+				  negate);
 		if (ret < 0) {
-			syslog(LOG_ERR, "memory error");
+			oc_syslog(LOG_ERR, "memory error");
 			return -1;
 		}
 
 		p2 = strchr(p, ')');
 		if (p2 == NULL) {
-			syslog(LOG_ERR, "expected closing parenthesis on restrict-user-to-ports at %d '%s'", (int)(ptrdiff_t)(p-str), str);
+			oc_syslog(
+				LOG_ERR,
+				"expected closing parenthesis on restrict-user-to-ports at %d '%s'",
+				(int)(ptrdiff_t)(p - str), str);
 			return -1;
 		}
 
 		p2++;
-		while (c_isspace(*p2))
+		while (isspace(*p2))
 			p2++;
 
 		if (*p2 == 0 || (negate != 0 && *p2 == ')')) {
 			finish = 1;
 		} else if (*p2 != ',') {
-			syslog(LOG_ERR, "expected comma or end of line on restrict-user-to-ports at %d '%s'", (int)(ptrdiff_t)(p2-str), str);
+			oc_syslog(
+				LOG_ERR,
+				"expected comma or end of line on restrict-user-to-ports at %d '%s'",
+				(int)(ptrdiff_t)(p2 - str), str);
 			return -1;
 		}
-		p=p2;
+		p = p2;
 		p++;
-	} while(finish == 0);
+	} while (finish == 0);
 
 	return 0;
 }

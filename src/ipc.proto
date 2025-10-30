@@ -64,6 +64,7 @@ message group_cfg_st
 	repeated fw_port_st fw_ports = 39;
 	optional string hostname = 40;
 	repeated string split_dns = 41;
+	optional uint32 client_bypass_protocol = 42;
 }
 
 /* AUTH_COOKIE_REP */
@@ -223,14 +224,14 @@ message latency_stats_delta
 /*
  * == Auth with username/password ==
  *
- *   sec-mod                        worker
- *                    <------     AUTH_INIT (username)
- * AUTH_REP(MSG,SID)  ------>
- *                    <------     AUTH_CONT (SID,password)
- *                       .
- *                       .
- *                       .
- * AUTH_REP(OK,COOKIE)------>
+ *   sec-mod                           worker
+ *                         <------   SEC_AUTH_INIT (username)
+ * SEC_AUTH_REP(MSG,SID)   ------>
+ *                         <------   SEC_AUTH_CONT (SID,password)
+ *                            .
+ *                            .
+ *                            .
+ * SEC_AUTH_REP(OK,COOKIE) ------>
  *
  *
  * The authentication is now identical for openconnect and
@@ -247,7 +248,7 @@ message sec_auth_init_msg
 	optional string group_name = 4; /* selected group name */
 	optional string cert_user_name = 5;
 	repeated string cert_group_names = 6;
-	required string ip = 8;
+	required string remote_ip = 8;
 	required uint32 auth_type = 9 [default = 0];
 	optional string our_ip = 10;
 	optional string user_agent = 11;
@@ -256,6 +257,8 @@ message sec_auth_init_msg
 	optional string vhost = 14;
 	required uint64 session_start_time = 15;
 	required bytes hmac = 16;
+	required string orig_remote_ip = 17; /* if proxy proto is in use this is
+					the original IP that initiated the session */
 }
 
 /* SEC_AUTH_CONT */
@@ -358,7 +361,7 @@ message cookie_int_msg
 	required bytes safe_id = 1;
 	required bool session_is_open = 2;
 	required bool tls_auth_ok = 3;
-	required uint32 created = 4;
+	required uint64 created = 4;
 	required string username = 5;
 	optional string groupname = 6;
 	required string user_agent = 7;
@@ -384,5 +387,5 @@ message secm_list_cookies_reply_msg
 /* snapshot_state */
 message snapshot_state_msg
 {
-	
+
 }

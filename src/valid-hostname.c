@@ -22,10 +22,9 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
-#include <c-strcase.h>
-#include <c-ctype.h>
+#include <ctype.h>
 
-unsigned valid_hostname(const char *host)
+unsigned int valid_hostname(const char *host)
 {
 	const char *p;
 
@@ -34,11 +33,10 @@ unsigned valid_hostname(const char *host)
 	if (*p == '-')
 		return 0;
 
-	while(*p != 0) {
-		if (!(c_isalnum(*p)) && !(*p == '-'))
+	while (*p != 0) {
+		if (!(isalnum(*p)) && !(*p == '-'))
 			return 0;
 		p++;
 	}
 	return 1;
 }
-

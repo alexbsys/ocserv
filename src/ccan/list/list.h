@@ -390,7 +390,7 @@ static inline const void *list_tail_(const struct list_head *h, size_t off)
  * properly filled `struct node_list' which in turn contains pointers to
  * memory chunks and it's turtles all the way down. Whith all that in mind
  * remember that given the wrong pointer/offset couple this macro will
- * happilly churn all you memory untill SEGFAULT stops it, in other words
+ * happilly churn all you memory until SEGFAULT stops it, in other words
  * caveat emptor.
  *
  * It is worth mentioning that one of legitimate use-cases for that wrapper

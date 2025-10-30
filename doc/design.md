@@ -1,6 +1,6 @@
 # Intro
 
-To enforce isolation between clients and with the authenticating process, 
+To enforce isolation between clients and with the authenticating process,
 ocserv consists of 3 components; the main process, the security module and
 the worker processes. The following sections describe the purpose and tasks
 assigned to each component, and the last section describes the communication
@@ -9,20 +9,39 @@ protocol between them.
 
 # VPN overview
 
-See https://ocserv.gitlab.io/www/technical.html
+```mermaid
+flowchart LR
+    ms((main server))
+    wp((worker process))
+    sm((security module))
+    user[user]
+    subgraph root privileges
+    ms --> sm
+    sm --> ms
+    end
+    subgraph Non privileged/seccomp isolation
+    ms --> wp
+    wp --> ms
+    wp --> sm
+    sm --> wp
+    end
+    user --> wp
+    wp --> user
+```
 
+See also https://ocserv.openconnect-vpn.net/technical.html
 
 ## The main process
 
 The main component consists of the process which is tasked to:
- 
+
  * Listen for incoming TCP connections and fork/exec a new worker process
    to handle it. - See main.c
 
- * State is passed between main process and worker via an environment 
+ * State is passed between main process and worker via an environment
    variable.
 
- * Listen for incomping UDP "connections" and forward the packet stream
+ * Listen for incoming UDP "connections" and forward the packet stream
    to the appropriate worker process. - See main.c
 
  * Create and forward to workers with an authenticated user a dedicated
@@ -57,7 +76,7 @@ leaked during a fork(). It handles:
 
  * Partial certificate authentication. A user certificate received by the
    worker process, is verified by it, and on its SM_CMD_AUTH_INIT message
-   it indicates the verification status. The security module approves, 
+   it indicates the verification status. The security module approves,
    and performs any other authentication method necessary.
 
  * Gatekeeper for accounting information keeping and reporting. That is
@@ -107,28 +126,28 @@ device and the client. The tasks handled are:
 
 * Authentication
 
-``` 
-  main                 sec-mod                 worker
-   |                       |                      |
-   |                       |  <--SEC_AUTH_INIT--- |
-   |                       |  ---SEC_AUTH_REPLY-> |
-   |                       |  <--SEC_AUTH_CONT--- |
-   |                       |         .            |
-   |                       |         .            |
-   |                       |         .            |
-   |                       |  ---SEC_AUTH_REPLY-> |
-   |                       |                      |
-   | <----------AUTH_COOKIE_REQ------------------ |
-   |                       |                      |
-   | --SECM_SESSION_OPEN-> |                      |
-   | <-SECM_SESSION_REPLY- |                      |   #contains additional config for client
-   |                       |                      |
-   | ---------------AUTH_COOKIE_REP-------------> |   #forwards the additional config for client
-   |                       |                      |
-   | <------------SESSION_INFO------------------- |
-   |                       |                      |
-   |                       | <-- SEC_CLI_STATS -- |
-   |                       |            (disconnect)
+```
+  main                 sec-mod                  worker
+   |                       |                       |
+   |                       | <--SEC_AUTH_INIT----- |
+   |                       | ---SEC_AUTH_REP-----> |
+   |                       | <--SEC_AUTH_CONT----- |
+   |                       |         .             |
+   |                       |         .             |
+   |                       |         .             |
+   |                       | ---SEC_AUTH_REP-----> |
+   |                       |                       |
+   | <----------AUTH_COOKIE_REQ------------------- |
+   |                       |                       |
+   | --SECM_SESSION_OPEN-> |                       |
+   | <-SECM_SESSION_REPLY- |                       |   #contains additional config for client
+   |                       |                       |
+   | ---------------AUTH_COOKIE_REP--------------> |   #forwards the additional config for client
+   |                       |                       |
+   | <------------SESSION_INFO-------------------- |
+   |                       |                       |
+   |                       | <--SEC_CLI_STATS----- |
+   |                       |             (disconnect)
    | -SECM_SESSION_CLOSE-> |
    | <---SECM_CLI_STATS--- |
 
@@ -151,35 +170,35 @@ device and the client. The tasks handled are:
 This is the same diagram as above but shows how the session ID (SID)
 is assigned and used throughout the server.
 
-``` 
-  main                  sec-mod                       worker
-   |                       |                            |
-   |                       |  <--SEC_AUTH_INIT---       |
-   |                       |  -SEC_AUTH_REP (NEW SID)-> |
-   |                       |  <--SEC_AUTH_CONT (SID)--- |
-   |                       |         .                  |
-   |                       |         .                  |
-   |                       |         .                  |
-   |                       |  ----SEC_AUTH_REP -------> |
+```
+  main                        sec-mod                        worker
+   |                             |                             |
+   |                             | <--SEC_AUTH_INIT----------- |
+   |                             | --SEC_AUTH_REP (NEW SID)--> |
+   |                             | <--SEC_AUTH_CONT (SID)----- |
+   |                             |         .                   |
+   |                             |         .                   |
+   |                             |         .                   |
+   |                             | -----SEC_AUTH_REP --------> |
 
 (note that by that time the client/worker may be disconnected,
 and reconnect later and use the cookie -SID- to resume the
 already authenticated session).
 
-   |                       |                            |
-   | <----------AUTH_COOKIE_REQ (SID)-----------------  |
-   |                       |                            |
-   | -SESSION_OPEN (SID)-> |                            |
-   | <--SESSION_REPLY----  |                            |   #contains additional config for client
-   |                       |                            |
-   | -----------------AUTH_REP----------------------->  |   #forwards the additional config for client
-   |                       |                            |
-   | <------------SESSION_INFO------------------------  |
-   |                       |                            |
-   |                       | <-- CLI_STATS (SID)------- |
-   |                       |            (disconnect)
-   | -SESSION_CLOSE(SID)-> |
-   | <-- CLI_STATS (SID)-- |
+   |                             |                             |
+   | <----------------AUTH_COOKIE_REQ (SID)------------------- |
+   |                             |                             |
+   | --SECM_SESSION_OPEN (SID)-> |                             |
+   | <--SECM_SESSION_REPLY------ |                             |   #contains additional config for client
+   |                             |                             |
+   | -----------------AUTH_COOKIE_REP------------------------> |   #forwards the additional config for client
+   |                             |                             |
+   | <------------------SESSION_INFO-------------------------- |
+   |                             |                             |
+   |                             | <--SEC_CLI_STATS (SID)----- |
+   |                             |            (disconnect)
+   | -SECM_SESSION_CLOSE (SID)-> |
+   | <--SECM_CLI_STATS (SID)---- |
 
 ```
 
@@ -191,7 +210,7 @@ roam between networks without significant disruption in the VPN service.
 
 ## When compile with --enable-latency-stats
 
-The ocserv server gathers statistical data about the latency incurred while processing received DTLS packets. Due to the volume of data being collected, processing is perfomed in batches. Batch size is a tradeoff of memory usage and statistical accuracy. All values are stored in microseconds (10^-6 seconds).
+The ocserv server gathers statistical data about the latency incurred while processing received DTLS packets. Due to the volume of data being collected, processing is performed in batches. Batch size is a tradeoff of memory usage and statistical accuracy. All values are stored in microseconds (10^-6 seconds).
 
 * Latency samples are first batched by the ocserv-worker, which gathers LATENCY_SAMPLE_SIZE (1024) of latency data.
 
@@ -209,14 +228,14 @@ The ocserv server gathers statistical data about the latency incurred while proc
 
 ## Load Balancer integration
 
-Ocserv can be deployed behind a layer 3 load balancer to support high availabilty and scale. 
+Ocserv can be deployed behind a layer 3 load balancer to support high availability and scale.
 
 ### Example load balancer configuration using keepalived.
 This is not intended as an exhaustive guide to configuring keepalived, but rather as a high level overview.
 
 * One or more hosts (directors) running keepalived, with a virtual IP assigned to them, optionally using VRRP to manage VIP failover (not shown here).
 
-* Three or more instances of ocserv running on hosts (real-server). Virtual IP assigned to the loopback interface with an ARP filter to prevent them from avertising.
+* Three or more instances of ocserv running on hosts (real-server). Virtual IP assigned to the loopback interface with an ARP filter to prevent them from advertising.
 
 * Define a iptables rule to tag incoming traffic to be load balanced:
 ```
@@ -253,4 +272,4 @@ virtual_server fwmark 1 {
 
 * Set ocserv option "server-drain-ms = 10000" (2 times the health check interval) to permit graceful shutdown of ocserv instances. This setting adds a delay between the time when the server stops accepting new connections (which causes the load balancer to view it as unhealthy) and when existing clients are disconnected. This prevents clients from attempting to reconnect to a server that is shutting down or has recently shutdown.
 
-* Notes on sizing the HA cluster. Best practices for high availability are to maintain a minimum of two spare nodes as this permits for one node to be undergoing maintenance and for an unplanned failure on a second node. Each node should be sized to account for a rapid reconnect of all clients, which will cause a spike of CPU utilization due to TLS key exchange. The rate-limit-ms can be used to flatten the spike at the expense of some clients retrying their connections. 
+* Notes on sizing the HA cluster. Best practices for high availability are to maintain a minimum of two spare nodes as this permits for one node to be undergoing maintenance and for an unplanned failure on a second node. Each node should be sized to account for a rapid reconnect of all clients, which will cause a spike of CPU utilization due to TLS key exchange. The rate-limit-ms can be used to flatten the spike at the expense of some clients retrying their connections.

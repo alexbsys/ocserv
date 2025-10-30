@@ -18,8 +18,8 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
-#ifndef DEFS_H
-#define DEFS_H
+#ifndef OC_DEFS_H
+#define OC_DEFS_H
 
 #include <syslog.h>
 
@@ -27,7 +27,6 @@
 #define LOG_HTTP_DEBUG 2048
 #define LOG_TRANSFER_DEBUG 2049
 #define LOG_SENSITIVE 2050
-
 
 /* User Disconnect reasons (must be > 0) */
 #define REASON_ANY 1
@@ -45,13 +44,13 @@
 #define MAX_WAIT_SECS 3
 
 /* Debug definitions for logger */
-#define DEBUG_BASIC 1
-#define DEBUG_INFO  2
-#define DEBUG_DEBUG 3
-#define DEBUG_HTTP  4
-#define DEBUG_TRANSFERRED 5
-#define DEBUG_SENSITIVE 8
-#define DEBUG_TLS   9
+#define OCLOG_BASIC 1
+#define OCLOG_INFO 2
+#define OCLOG_DEBUG 3
+#define OCLOG_HTTP 4
+#define OCLOG_TRANSFERRED 5
+#define OCLOG_SENSITIVE 8
+#define OCLOG_TLS 9
 
 /* Authentication states */
 enum {
@@ -76,7 +75,7 @@ typedef enum {
 	CMD_SESSION_INFO = 13,
 	CMD_BAN_IP = 16,
 	CMD_BAN_IP_REPLY = 17,
-	CMD_LATENCY_STATS_DELTA = 18,	
+	CMD_LATENCY_STATS_DELTA = 18,
 
 	/* from worker to sec-mod */
 	CMD_SEC_AUTH_INIT = 120,
@@ -90,7 +89,7 @@ typedef enum {
 	CMD_SEC_CLI_STATS,
 
 	/* from main to sec-mod and vice versa */
-	MIN_SECM_CMD=239,
+	MIN_SECM_CMD = 239,
 	CMD_SECM_SESSION_OPEN, /* sync: reply is CMD_SECM_SESSION_REPLY */
 	CMD_SECM_SESSION_CLOSE, /* sync: reply is CMD_SECM_CLI_STATS */
 	CMD_SECM_SESSION_REPLY,

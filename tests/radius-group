@@ -33,7 +33,7 @@ RADIUSD=$(which radiusd)
 
 if test -z "${RADIUSD}";then
 	RADIUSD=$(which freeradius)
-fi 
+fi
 
 . `dirname $0`/common.sh
 
@@ -66,12 +66,13 @@ function finish {
   test -n "${CLIPID}" && rm -f ${CLIPID} >/dev/null 2>&1
   test -n "${CONFIG}" && rm -f ${CONFIG} >/dev/null 2>&1
   rm -f ${OUTFILE} 2>&1
+  test -f "${RADIUSLOG}" && cat "${RADIUSLOG}"
+  rm -f "${RADIUSLOG}"
 }
 trap finish EXIT
 
 # server address
-ADDRESS=10.173.78.1
-CLI_ADDRESS=10.173.79.1
+. `dirname $0`/random-net.sh
 
 # These must match the data/raddb/users:test-class user
 VPNNET=192.168.93.0/24
@@ -85,7 +86,7 @@ OCCTL_SOCKET=./occtl-radius-group-$$.socket
 ${CMDNS2} ${IP} link set dev lo up
 
 # Run servers
-${CMDNS2} ${RADIUSD} -d ${srcdir}/data/raddb/ -s -x -l ${RADIUSLOG} &
+${CMDNS2} ${RADIUSD} -d ${srcdir}/data/raddb/ -s -xx -l ${RADIUSLOG} &
 RADIUSPID=$!
 
 update_config radius-group.config
@@ -100,7 +101,7 @@ sleep 4
 
 echo " * Tests the radius group functionality"
 USERNAME=test-class
-( echo "${USERNAME}" | ${CMDNS1} ${OPENCONNECT} ${ADDRESS}:${PORT} --authgroup group2 -u ${USERNAME} --servercert=d66b507ae074d03b02eafca40d35f87dd81049d3 -s ${srcdir}/scripts/vpnc-script --pid-file=${CLIPID} --passwd-on-stdin -b )
+( echo "${USERNAME}" | ${CMDNS1} ${OPENCONNECT} ${ADDRESS}:${PORT} --authgroup group2 -u ${USERNAME} --servercert=pin-sha256:xp3scfzy3rOQsv9NcOve/8YVVv+pHr4qNCXEXrNl5s8= -s ${srcdir}/scripts/vpnc-script --pid-file=${CLIPID} --passwd-on-stdin -b )
 if test $? != 0;then
 	echo "Could not connect to server"
 	exit 1
@@ -137,7 +138,7 @@ sleep 4
 
 echo " * Tests the alt radius group functionality"
 USERNAME=test-class
-( echo "${USERNAME}" | ${CMDNS1} ${OPENCONNECT} ${ADDRESS}:${PORT} --authgroup group1 -u ${USERNAME} --servercert=d66b507ae074d03b02eafca40d35f87dd81049d3 -s ${srcdir}/scripts/vpnc-script --pid-file=${CLIPID} --passwd-on-stdin -b )
+( echo "${USERNAME}" | ${CMDNS1} ${OPENCONNECT} ${ADDRESS}:${PORT} --authgroup group1 -u ${USERNAME} --servercert=pin-sha256:xp3scfzy3rOQsv9NcOve/8YVVv+pHr4qNCXEXrNl5s8= -s ${srcdir}/scripts/vpnc-script --pid-file=${CLIPID} --passwd-on-stdin -b )
 if test $? != 0;then
 	echo "Could not connect to server"
 	exit 1

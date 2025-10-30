@@ -34,11 +34,10 @@
 #include <str.h>
 #include <common.h>
 
-static
-int call_script(main_server_st *s, proc_st *proc, const char *cmd)
+static int call_script(main_server_st *s, proc_st *proc, const char *cmd)
 {
-pid_t pid;
-int ret, status = 0;
+	pid_t pid;
+	int ret, status = 0;
 
 	if (cmd == NULL)
 		return 0;
@@ -50,8 +49,9 @@ int ret, status = 0;
 		mslog(s, proc, LOG_DEBUG, "executing route script %s", cmd);
 		ret = execl("/bin/sh", "sh", "-c", cmd, NULL);
 		if (ret == -1) {
-			mslog(s, proc, LOG_ERR, "Could not execute route script %s", cmd);
-			exit(1);
+			mslog(s, proc, LOG_ERR,
+			      "Could not execute route script %s", cmd);
+			exit(EXIT_FAILURE);
 		}
 
 		exit(77);
@@ -72,22 +72,22 @@ int ret, status = 0;
 	}
 
 	if (WEXITSTATUS(status)) {
-		mslog(s, proc, LOG_INFO, "cmd: %s: exited with error %d", cmd, WEXITSTATUS(ret));
+		mslog(s, proc, LOG_INFO, "cmd: %s: exited with error %d", cmd,
+		      WEXITSTATUS(ret));
 		return ERR_EXEC;
 	}
 
 	return 0;
 }
 
-static
-int replace_cmd(struct main_server_st* s, proc_st *proc, 
-		char **cmd, const char* pattern, 
-		const char* route, const char* dev)
+static int replace_cmd(struct main_server_st *s, proc_st *proc, char **cmd,
+		       const char *pattern, const char *route, const char *dev)
 {
 	str_st str;
 	int ret;
 	str_rep_tab tab[6];
 
+	STR_TAB_INIT(tab, sizeof(tab));
 	STR_TAB_SET(0, "%{R}", route);
 	STR_TAB_SET(1, "%R", route);
 	STR_TAB_SET(2, "%{D}", dev);
@@ -105,23 +105,23 @@ int replace_cmd(struct main_server_st* s, proc_st *proc,
 	if (ret < 0)
 		goto fail;
 
-	*cmd = (char*)str.data;
+	*cmd = (char *)str.data;
 
 	return 0;
- fail:
+fail:
 	str_clear(&str);
 	return ERR_MEM;
 }
 
-static
-int route_adddel(struct main_server_st* s, proc_st *proc,
-		 const char* pattern, const char* route, const char* dev)
+static int route_adddel(struct main_server_st *s, proc_st *proc,
+			const char *pattern, const char *route, const char *dev)
 {
-int ret;
-char *cmd = NULL;
+	int ret;
+	char *cmd = NULL;
 
 	if (pattern == 0) {
-		mslog(s, NULL, LOG_WARNING, "route-add-cmd or route-del-cmd are not set.");
+		mslog(s, NULL, LOG_WARNING,
+		      "route-add-cmd or route-del-cmd are not set.");
 		return 0;
 	}
 
@@ -132,42 +132,45 @@ char *cmd = NULL;
 	ret = call_script(s, proc, cmd);
 	if (ret < 0) {
 		int e = errno;
-		mslog(s, NULL, LOG_INFO, "failed to spawn cmd: %s: %s", cmd, strerror(e));
+
+		mslog(s, NULL, LOG_INFO, "failed to spawn cmd: %s: %s", cmd,
+		      strerror(e));
 		ret = ERR_EXEC;
 		goto fail;
 	}
 
 	ret = 0;
- fail:
- 	talloc_free(cmd);
+fail:
+	talloc_free(cmd);
 	return ret;
 }
 
-static
-int route_add(struct main_server_st* s, proc_st *proc, const char* route, const char* dev)
+static int route_add(struct main_server_st *s, proc_st *proc, const char *route,
+		     const char *dev)
 {
 	return route_adddel(s, proc, GETCONFIG(s)->route_add_cmd, route, dev);
 }
 
-static
-int route_del(struct main_server_st* s, proc_st *proc, const char* route, const char* dev)
+static int route_del(struct main_server_st *s, proc_st *proc, const char *route,
+		     const char *dev)
 {
 	return route_adddel(s, proc, GETCONFIG(s)->route_del_cmd, route, dev);
 }
 
-/* Executes the commands required to apply all the configured routes 
+/* Executes the commands required to apply all the configured routes
  * for this client locally.
  */
-int apply_iroutes(struct main_server_st* s, struct proc_st *proc)
+int apply_iroutes(struct main_server_st *s, struct proc_st *proc)
 {
-unsigned i, j;
-int ret;
+	unsigned int i, j;
+	int ret;
 
 	if (proc->config->n_iroutes == 0)
 		return 0;
 
-	for (i=0;i<proc->config->n_iroutes;i++) {
-		ret = route_add(s, proc, proc->config->iroutes[i], proc->tun_lease.name);
+	for (i = 0; i < proc->config->n_iroutes; i++) {
+		ret = route_add(s, proc, proc->config->iroutes[i],
+				proc->tun_lease.name);
 		if (ret < 0)
 			goto fail;
 	}
@@ -175,27 +178,27 @@ int ret;
 
 	return 0;
 fail:
-	for (j=0;j<i;j++)
-		route_del(s, proc, proc->config->iroutes[j], proc->tun_lease.name);
+	for (j = 0; j < i; j++)
+		route_del(s, proc, proc->config->iroutes[j],
+			  proc->tun_lease.name);
 
 	return -1;
 }
 
-/* Executes the commands required to removed all the configured routes 
+/* Executes the commands required to removed all the configured routes
  * for this client.
  */
-void remove_iroutes(struct main_server_st* s, struct proc_st *proc)
+void remove_iroutes(struct main_server_st *s, struct proc_st *proc)
 {
-unsigned i;
+	unsigned int i;
 
-	if (proc->config == NULL || proc->config->n_iroutes == 0 || proc->applied_iroutes == 0)
+	if (proc->config == NULL || proc->config->n_iroutes == 0 ||
+	    proc->applied_iroutes == 0)
 		return;
 
-	for (i=0;i<proc->config->n_iroutes;i++) {
-		route_del(s, proc, proc->config->iroutes[i], proc->tun_lease.name);
+	for (i = 0; i < proc->config->n_iroutes; i++) {
+		route_del(s, proc, proc->config->iroutes[i],
+			  proc->tun_lease.name);
 	}
 	proc->applied_iroutes = 0;
-
-	return;
 }
-

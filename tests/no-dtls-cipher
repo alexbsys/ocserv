@@ -25,4 +25,3 @@ CIPHER_NAME="UNKNOWN"
 GNUTLS_NAME=""
 
 . cipher-common.sh
-

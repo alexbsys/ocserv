@@ -33,36 +33,7 @@ and handling of a 'plain' password file used by ocserv.
   * **-v, --version**::
     Output version of program and exit.
 
-## FILES
-The password format of ocpasswd is as follows.
-
-```
-username:groupname:encoded-password
-```
-
-The crypt(3) encoding is used for the encoded-password.
-
-## EXAMPLES
-
-### Adding a user
-
-```
-$ ocpasswd -c ocpasswd my_username
-```
-
-### Locking a user
-
-```
-$ ocpasswd -c ocpasswd -l my_username
-```
-
-### Unlocking a user
-
-```
-$ ocpasswd -c ocpasswd -u my_username
-```
-
-## Exit status
+## EXIT STATUS
 
   * **0**:
     Successful program execution.
@@ -70,15 +41,37 @@ $ ocpasswd -c ocpasswd -u my_username
   * **1**:
     The operation failed or the command syntax was not valid.
 
+## FILES
+The password format of ocpasswd is as follows.
+
+    username:groupname:encoded-password
+
+The crypt(3) encoding is used for the encoded-password.
+
+## EXAMPLES
+
+### Adding a user
+
+    $ ocpasswd -c ocpasswd my_username
+
+### Locking a user
+
+    $ ocpasswd -c ocpasswd -l my_username
+
+### Unlocking a user
+
+    $ ocpasswd -c ocpasswd -u my_username
+
+## AUTHORS
+Written by Nikos Mavrogiannopoulos. Many people have contributed to it.
+
+## REPORTING BUGS
+Issue tracker: https://gitlab.com/openconnect/ocserv/-/issues
+
+## COPYRIGHT
+Copyright (C) 2013-2024 Nikos Mavrogiannopoulos and others, all rights reserved.
+This program is released under the terms of the GNU General Public License, version 2.
+
 ## SEE ALSO
 
 ocserv(8), occtl(8)
-
-## COPYRIGHT
-Copyright (C) 2013-2017 Nikos Mavrogiannopoulos and others, all rights reserved.
-This program is released under the terms of the GNU General Public License, version 2.
-
-## AUTHORS
-Written by Nikos Mavrogiannopoulos. Many people have
-contributed to it.
-

@@ -33,7 +33,7 @@
 #
 # Cleanup is automatic via a trap
 #  Requires: finish() to be defined
- 
+
 
 PATH=${PATH}:/usr/sbin
 IP=$(which ip)
@@ -118,11 +118,11 @@ ${IP} -n ${NSNAME2} route
 ${IP} -n ${NSNAME1} route
 test -n "${CLI_ADDRESS2}" && ${IP} -n ${NSNAME3} route
 
-${IP} netns exec ${NSNAME1} ping -c 1 ${ADDRESS} >/dev/null 
-${IP} netns exec ${NSNAME2} ping -c 1 ${ADDRESS} >/dev/null 
+${IP} netns exec ${NSNAME1} ping -c 1 ${ADDRESS} >/dev/null
+${IP} netns exec ${NSNAME2} ping -c 1 ${ADDRESS} >/dev/null
 ${IP} netns exec ${NSNAME2} ping -c 1 ${CLI_ADDRESS} >/dev/null
-test -n "${ADDRESS2}" && ${IP} netns exec ${NSNAME2} ping -c 1 ${ADDRESS2} >/dev/null 
-test -n "${CLI_ADDRESS2}" && ${IP} netns exec ${NSNAME2} ping -c 1 ${CLI_ADDRESS2} >/dev/null 
+test -n "${ADDRESS2}" && ${IP} netns exec ${NSNAME2} ping -c 1 ${ADDRESS2} >/dev/null
+test -n "${CLI_ADDRESS2}" && ${IP} netns exec ${NSNAME2} ping -c 1 ${CLI_ADDRESS2} >/dev/null
 set +e
 
 CMDNS1="${IP} netns exec ${NSNAME1}"

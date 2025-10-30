@@ -1,10 +1,10 @@
 # ocserv -- Information about our contribution rules and coding style
 
  Anyone is welcome to contribute to ocserv. You can either take up
-tasks from our [planned list](https://gitlab.com/ocserv/ocserv/milestones),
-or suprise us with enhancement we didn't plan for. In all cases be prepared
+tasks from our [planned list](https://gitlab.com/openconnect/ocserv/-/milestones),
+or surprise us with enhancement we didn't plan for. In all cases be prepared
 to defend and justify your enhancements, and get through few rounds
-of changes. 
+of changes.
 
 We try to stick to the following rules, so when contributing please
 try to follow them too.
@@ -13,11 +13,11 @@ try to follow them too.
 ## Git commits:
 
 Note that when contributing code you will need to assert that the contribution is
-in accordance to the "Developer's Certificate of Origin" as found in the 
+in accordance to the "Developer's Certificate of Origin" as found in the
 file [DCO.txt](doc/DCO.txt).
 
 To indicate that, make sure that your contributions (patches or merge requests),
-contain a "Signed-off-by" line, with your real name and e-mail address. 
+contain a "Signed-off-by" line, with your real name and e-mail address.
 To automate the process use "git am -s" to produce patches and/or set the
 a template to simplify this process, as follows.
 
@@ -39,7 +39,7 @@ which is only run during development.
 file in the repository. The goal is to have a test suite which runs for
 every new merge request prior to merging. There are no particular rules for
 the test targets, except for them being reliable and running in a reasonable
-timeframe (~1 hour).
+time frame (~1 hour).
 
 
 ## Reviewing code
@@ -55,19 +55,11 @@ as compiling and testing code and features.
 [Guidelines to consider when reviewing.](https://github.com/thoughtbot/guides/tree/master/code-review)
 
 
-## Gnulib / CCAN
+## CCAN
 
-The directory `gl/`, contains gnulib files. The directly `src/ccan` contains
-libraries from the [CCAN project](https://github.com/rustyrussell/ccan),
-both are used as collections of helper code.
-
-To update to the latest gnulib sources you can run:
-```
-$ make gl
-```
-
-When considering a helper module check those projects; we have a mild
-preference towards CCAN.
+The directory `src/ccan` contains libraries from the
+[CCAN project](https://github.com/rustyrussell/ccan).
+When considering a helper module, check CCAN first.
 
 
 # Coding style

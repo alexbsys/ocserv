@@ -3,5 +3,3 @@
 <config-auth client="vpn" type="init">
     <version who="vpn">v5.01</version>
 </config-auth>
-
-

@@ -33,7 +33,7 @@ RADIUSD=$(which radiusd)
 
 if test -z "${RADIUSD}";then
 	RADIUSD=$(which freeradius)
-fi 
+fi
 
 . `dirname $0`/common.sh
 
@@ -66,6 +66,8 @@ function finish {
   test -n "${CLIPID}" && rm -f ${CLIPID} >/dev/null 2>&1
   test -n "${CONFIG}" && rm -f ${CONFIG} >/dev/null 2>&1
   rm -f ${OUTFILE} 2>&1
+  test -f "${RADIUSLOG}" && cat "${RADIUSLOG}"
+  rm -f "${RADIUSLOG}"
 }
 trap finish EXIT
 
@@ -92,8 +94,7 @@ function wait_file_contents {
 }
 
 # server address
-ADDRESS=10.102.246.1
-CLI_ADDRESS=10.102.247.1
+. `dirname $0`/random-net.sh
 
 # These addresses must match the radius sent ranges
 VPNNET=192.168.66.0/24
@@ -109,7 +110,7 @@ ${CMDNS2} ${IP} link set dev lo up
 
 # Run servers
 rm -f ${RADIUSLOG}
-${CMDNS2} ${RADIUSD} -d ${srcdir}/data/raddb/ -s -x -l ${RADIUSLOG} &
+${CMDNS2} ${RADIUSD} -d ${srcdir}/data/raddb/ -s -xx -l ${RADIUSLOG} &
 RADIUSPID=$!
 
 update_config radius.config
@@ -123,7 +124,7 @@ sleep 4
 
 echo " * Connecting to ${ADDRESS}:${PORT}..."
 USERNAME=testtime
-( echo "test" | ${CMDNS1} ${OPENCONNECT} ${ADDRESS}:${PORT} -u ${USERNAME} --servercert=d66b507ae074d03b02eafca40d35f87dd81049d3 -s ${srcdir}/scripts/vpnc-script --pid-file=${CLIPID} --passwd-on-stdin -b )
+( echo "test" | ${CMDNS1} ${OPENCONNECT} ${ADDRESS}:${PORT} -u ${USERNAME} --servercert=pin-sha256:xp3scfzy3rOQsv9NcOve/8YVVv+pHr4qNCXEXrNl5s8= -s ${srcdir}/scripts/vpnc-script --pid-file=${CLIPID} --passwd-on-stdin -b )
 if test $? != 0;then
 	echo "Could not connect to server"
 	exit 1
@@ -159,6 +160,21 @@ if test $? != 0;then
 	echo "could not find user information"
 	exit 1
 fi
+
+grep "Limit RX: 16" ${OUTFILE}
+if test $? != 0;then
+	${OCCTL} -s ${OCCTL_SOCKET} show user ${USERNAME}
+	echo "occtl show user didn't find upstream speed limit!"
+	exit 1
+fi
+
+grep "Limit TX: 64" ${OUTFILE}
+if test $? != 0;then
+	${OCCTL} -s ${OCCTL_SOCKET} show user ${USERNAME}
+	echo "occtl show user didn't find downstream speed limit!"
+	exit 1
+fi
+
 
 echo "Waiting for accounting report"
 

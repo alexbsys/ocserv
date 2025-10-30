@@ -1,4 +1,5 @@
 stages:
+ - preliminaries  # signoff / static analysis
  - testing
  - deploy
 
@@ -7,13 +8,25 @@ variables:
   ALPINE_BUILD: buildenv-alpine
   DEBIAN_BUILD: buildenv-debian
   DEBIAN_X86_CROSS_BUILD: buildenv-debian-x86
-  FEDORA_BUILD: buildenv-fedora
+  FEDORA_BUILD: buildenv-fedora41
   UBUNTU16_BUILD: buildenv-ubuntu
   UBUNTU20_BUILD: buildenv-ubuntu20
+  UBUNTU22_BUILD: buildenv-ubuntu22
   CENTOS8_BUILD: buildenv-centos8
+  CENTOS9_BUILD: buildenv-centos9
   CENTOS7_BUILD: buildenv-centos7
   CENTOS6_BUILD: buildenv-centos6
+  MINIMALCONFIG: "--without-protobuf --without-libtalloc-prefix --without-libnl --without-maxmind --without-geoip --without-libreadline-prefix --without-liboath --without-libc-prefix --without-pam --without-radius --without-libcrypt-prefix --without-utmp --without-libutil-prefix --without-libwrap --without-libwrap-prefix --without-libseccomp-prefix --without-libsystemd-prefix --without-llhttp --without-lz4 --without-gssapi --without-pcl-lib --disable-rpath --disable-seccomp --disable-anyconnect-compat --disable-compression"
   JOBS: 2
+
+Signoff:
+  stage: preliminaries
+  script:
+  # Quoted to work around https://gitlab.com/gitlab-org/gitlab-foss/-/issues/20177
+  - 'echo "Checking for new commits without Signed-off-by: tags as described in https://gitlab.com/openconnect/ocserv/-/blob/master/CONTRIBUTING.md"'
+  # Last bad commit
+  - 'git log 7c8abd2e2ca6ec0dffb8c7768c3839e057f21ee7.. --grep "(^Signed-off-by)|(^Merge branch)|(^This reverts commit)" --extended-regexp --invert-grep --exit-code'
+  - echo "None (good)"
 
 Debian:
   stage: testing
@@ -22,13 +35,12 @@ Debian:
   - chmod -R o-w tests/data/raddb
   - git submodule update --init
   - autoreconf -fvi
-  - ./configure --without-nuttcp-tests --enable-oidc-auth
+  - ./configure --enable-oidc-auth
   - make -j$JOBS
   - export OCSERV_ALLOW_BROKEN_CLIENTS=1
   - make check -j$JOBS
   tags:
-  - shared
-  - linux
+  - saas-linux-small-amd64
   except:
   - tags
   - schedules
@@ -50,31 +62,7 @@ i386/Debian:
   - make -j$JOBS
   - make check -j$JOBS VERBOSE=1
   tags:
-  - shared
-  - linux
-  except:
-  - tags
-  - schedules
-  artifacts:
-    expire_in: 1 week
-    when: on_failure
-    paths:
-      - ./*.log
-      - ./tests/*.log
-
-Ubuntu16.04:
-  stage: testing
-  image: $CI_REGISTRY/$BUILD_IMAGES_PROJECT:$UBUNTU16_BUILD
-  script:
-  - git submodule update --init
-  - autoreconf -fvi
-  - ./configure --without-nuttcp-tests
-  - make -j$JOBS
-# this version of openconnect doesn't work with IPv6 only
-  - make check -j$JOBS XFAIL_TESTS=ipv6-iface
-  tags:
-  - shared
-  - linux
+  - saas-linux-small-amd64
   except:
   - tags
   - schedules
@@ -96,8 +84,32 @@ Ubuntu20.04:
   - export MALLOC_CHECK_=3
   - make check -j$JOBS
   tags:
-  - shared
-  - linux
+  - saas-linux-small-amd64
+  except:
+  - tags
+  - schedules
+  artifacts:
+    expire_in: 1 week
+    when: on_failure
+    paths:
+      - ./*.log
+      - ./tests/*.log
+
+Ubuntu22.04:
+  stage: testing
+  image: $CI_REGISTRY/$BUILD_IMAGES_PROJECT:$UBUNTU22_BUILD
+  script:
+  - git submodule update --init
+  - autoreconf -fvi
+  - ./configure --enable-oidc-auth --enable-latency-stats
+  - make -j$JOBS
+  - export MALLOC_CHECK_=3
+# There is an issue with gssapi on this version of Ubuntu. While
+# the package exists, it doesn't work as openssl doesn't support
+# md4. See https://bugs.launchpad.net/ubuntu/+source/gss-ntlmssp/+bug/1995915
+  - make check -j$JOBS XFAIL_TESTS="test-gssapi"
+  tags:
+  - saas-linux-small-amd64
   except:
   - tags
   - schedules
@@ -114,15 +126,36 @@ Centos8:
   script:
   - git submodule update --init
   - autoreconf -fvi
-  - ./configure --without-http-parser
+  - ./configure
   - chmod og-w tests/data/raddb
   - chmod og-w tests/data/raddb/*
   - make -j$JOBS
-  - export OCSERV_ALLOW_BROKEN_CLIENTS=1
   - make check VERBOSE=1 -j$JOBS
   tags:
-  - shared
-  - linux
+  - saas-linux-small-amd64
+  except:
+  - tags
+  - schedules
+  artifacts:
+    expire_in: 1 week
+    when: on_failure
+    paths:
+      - ./*.log
+      - ./tests/*.log
+
+Centos9:
+  stage: testing
+  image: $CI_REGISTRY/$BUILD_IMAGES_PROJECT:$CENTOS9_BUILD
+  script:
+  - git submodule update --init
+  - autoreconf -fvi
+  - ./configure
+  - chmod og-w tests/data/raddb
+  - chmod og-w tests/data/raddb/*
+  - make -j$JOBS
+  - make check VERBOSE=1 -j$JOBS
+  tags:
+  - saas-linux-small-amd64
   except:
   - tags
   - schedules
@@ -143,8 +176,7 @@ Centos7:
   - make -j$JOBS
   - make check -j$JOBS
   tags:
-  - shared
-  - linux
+  - saas-linux-small-amd64
   except:
   - tags
   - schedules
@@ -155,84 +187,8 @@ Centos7:
       - ./*.log
       - ./tests/*.log
 
-RPM/epel7:
-  stage: deploy
-  image: $CI_REGISTRY/$BUILD_IMAGES_PROJECT:$CENTOS7_BUILD
-  script:
-  - git submodule update --init
-  - autoreconf -fvi
-  - ./configure
-  - touch ChangeLog
-  - make dist
-  - CURDIR=$(pwd)
-  - TARFILE=$(find ./ -name '*.tar.xz')
-  - RPMVERSION=$(cat /usr/local/rpms/ocserv/*.spec|grep ^Version|awk '{print $2}')
-  - sed -i 's/XFAIL_TESTS=test-sighup-key-change//' /usr/local/rpms/ocserv/ocserv.spec
-  - NEWVERSION=$(echo $TARFILE|sed -e 's/ocserv-//' -e 's/\.tar\.xz//' -e 's|./||')
-  - echo "tarfile $TARFILE" && echo "rpm $RPMVERSION" && echo "new $NEWVERSION"
-  - cp $TARFILE /usr/local/rpms/ocserv
-  - cd /usr/local/rpms/ocserv
-  - sed -i -e "s/$RPMVERSION/$NEWVERSION/" -e 's/have_gpgv2 1/have_gpgv2 0/g' *.spec
-  - ( test "$RPMVERSION" != "$NEWVERSION" && cat sources|grep -v "ocserv-$RPMVERSION" >sources.tmp ) || /bin/true
-  - sha512sum --tag ocserv-$NEWVERSION.tar.xz >>sources.tmp
-  - mv sources.tmp sources
-  - touch ocserv-$NEWVERSION.tar.xz.sig
-  - fedpkg --release el7 local
-  - cd $CURDIR
-  - find /usr/local/rpms/ocserv -name '*.rpm' -exec cp '{}' ./ ';'
-  tags:
-  - shared
-  - linux
-  except:
-  - tags
-  - schedules
-  artifacts:
-    expire_in: 1 week
-    when: on_success
-    paths:
-     - ./*.rpm
-
-RPM/epel8:
-  stage: deploy
-  image: $CI_REGISTRY/$BUILD_IMAGES_PROJECT:$CENTOS8_BUILD
-  script:
-  - git submodule update --init
-  - autoreconf -fvi
-  - ./configure
-  - touch ChangeLog
-  - make dist
-  - CURDIR=$(pwd)
-  - TARFILE=$(find ./ -name '*.tar.xz')
-  - RPMVERSION=$(cat /usr/local/rpms/ocserv/*.spec|grep ^Version|awk '{print $2}')
-  - sed -i 's/XFAIL_TESTS=test-sighup-key-change//' /usr/local/rpms/ocserv/ocserv.spec
-  - NEWVERSION=$(echo $TARFILE|sed -e 's/ocserv-//' -e 's/\.tar\.xz//' -e 's|./||')
-  - echo "tarfile $TARFILE" && echo "rpm $RPMVERSION" && echo "new $NEWVERSION"
-  - cp $TARFILE /usr/local/rpms/ocserv
-  - cd /usr/local/rpms/ocserv
-  - sed -i -e "s/Patch0:\t\tocserv-1.1.2-tests.patch//" *.spec
-  - sed -i -e "s/$RPMVERSION/$NEWVERSION/" -e 's/have_gpgv2 1/have_gpgv2 0/g' *.spec
-  - ( test "$RPMVERSION" != "$NEWVERSION" && cat sources|grep -v "ocserv-$RPMVERSION" >sources.tmp ) || /bin/true
-  - sha512sum --tag ocserv-$NEWVERSION.tar.xz >>sources.tmp
-  - mv sources.tmp sources
-  - touch ocserv-$NEWVERSION.tar.xz.sig
-  - export OCSERV_ALLOW_BROKEN_CLIENTS=1
-  - fedpkg --release el8 local
-  - cd $CURDIR
-  - find /usr/local/rpms/ocserv -name '*.rpm' -exec cp '{}' ./ ';'
-  tags:
-  - shared
-  - linux
-  except:
-  - tags
-  - schedules
-  artifacts:
-    expire_in: 1 week
-    when: on_success
-    paths:
-     - ./*.rpm
-
 Coverity:
-  stage: testing
+  stage: preliminaries
   image: $CI_REGISTRY/$BUILD_IMAGES_PROJECT:$CENTOS8_BUILD
   only:
   - schedules
@@ -250,8 +206,7 @@ Coverity:
     --form file=@cov-int.tar.gz --form version="`git describe --tags`"
     --form description="CI build"
   tags:
-  - shared
-  - linux
+  - saas-linux-small-amd64
   artifacts:
     expire_in: 1 week
     when: on_failure
@@ -267,8 +222,7 @@ musl/Alpine:
   - ./configure --disable-maintainer-mode --with-werror
   - make -j$JOBS
   tags:
-  - shared
-  - linux
+  - saas-linux-small-amd64
   except:
   - tags
   - schedules
@@ -288,12 +242,11 @@ Fedora:
   - autoreconf -fvi
   - CFLAGS="-g -O0" ./configure --enable-code-coverage --with-kerberos-tests --enable-oidc-auth
   - make -j$JOBS
-  - make check -j$JOBS COVERAGE=1
-  - make dist
+  - make check -j$JOBS COVERAGE=1 VERBOSE=1
   - make local-code-coverage-output
+  coverage: '/coverage lines: \d+\.\d+/'
   tags:
-  - shared
-  - linux
+  - saas-linux-small-amd64
   except:
   - tags
   artifacts:
@@ -301,7 +254,7 @@ Fedora:
     untracked: true
     when: always
 
-noprocfs/Fedora:
+noprocfs/distcheck/Fedora:
   stage: testing
   image: $CI_REGISTRY/$BUILD_IMAGES_PROJECT:$FEDORA_BUILD
   script:
@@ -310,9 +263,9 @@ noprocfs/Fedora:
   - autoreconf -fvi
   - ac_cv_file_FILE__proc_self_exe=no ./configure --disable-namespaces
   - make -j$JOBS
+  - make distcheck VERBOSE=1 DISTCHECK_CONFIGURE_FLAGS="--disable-maintainer-mode" TESTS=""
   tags:
-  - shared
-  - linux
+  - saas-linux-small-amd64
   except:
   - tags
   - schedules
@@ -332,8 +285,7 @@ clang/Fedora:
   - make -j$JOBS
   - make check -j$JOBS
   tags:
-  - shared
-  - linux
+  - saas-linux-small-amd64
   except:
   - tags
   - schedules
@@ -354,8 +306,7 @@ seccomp/Fedora:
   - make -j$JOBS
   - make check -j$JOBS
   tags:
-  - shared
-  - linux
+  - saas-linux-small-amd64
   except:
   - tags
   - schedules
@@ -370,12 +321,11 @@ minimal:
   script:
   - git submodule update --init
   - autoreconf -fvi
-  - ./configure --without-libnl --without-liboath --without-pam --without-radius --without-utmp --without-libwrap --without-http-parser --without-lz4 --without-gssapi --without-pcl-lib --without-protobuf
+  - ./configure $MINIMALCONFIG
   - make -j$JOBS
-  - make check -j$JOBS XFAIL_TESTS="lz4-compression"
+  - make check -j$JOBS XFAIL_TESTS="lz4-compression lzs-compression"
   tags:
-  - shared
-  - linux
+  - saas-linux-small-amd64
   except:
   - tags
   - schedules
@@ -393,12 +343,11 @@ minimal/Ubuntu20.04:
   script:
   - git submodule update --init
   - autoreconf -fvi
-  - ./configure --without-protobuf --without-root-tests --without-nuttcp-tests --without-libtalloc-prefix --without-libnl --without-maxmind --without-geoip --without-libreadline-prefix --without-liboath --without-libc-prefix --without-pam --without-radius --without-libcrypt-prefix --without-utmp --without-libutil-prefix --without-libwrap --without-libwrap-prefix --without-libseccomp-prefix --without-libsystemd-prefix --without-http-parser --without-lz4 --without-gssapi --without-pcl-lib --disable-rpath --disable-seccomp --disable-anyconnect-compat --disable-compression
+  - ./configure $MINIMALCONFIG
   - make -j$JOBS
-  - make check -j$JOBS
+  - make check -j$JOBS XFAIL_TESTS="lz4-compression lzs-compression"
   tags:
-  - shared
-  - linux
+  - saas-linux-small-amd64
   except:
   - tags
   - schedules
@@ -422,8 +371,7 @@ asan/clang/Fedora:
   - make -j$JOBS
   - make check -j$JOBS
   tags:
-  - shared
-  - linux
+  - saas-linux-small-amd64
   except:
   - tags
   - schedules
@@ -446,8 +394,7 @@ ubsan/Fedora:
   - make -j$JOBS
   - make check -j$JOBS CFLAGS="$UBCFLAGS -Wno-unused-function -Wno-unused-parameter"
   tags:
-  - shared
-  - linux
+  - saas-linux-small-amd64
   except:
   - tags
   - schedules
@@ -458,17 +405,15 @@ ubsan/Fedora:
       - ./*.log
       - tests/*.log
 
-static-analyzers/Fedora:
-  stage: testing
+static-analyzer/Fedora:
+  stage: preliminaries
   image: $CI_REGISTRY/$BUILD_IMAGES_PROJECT:$FEDORA_BUILD
   script:
   - autoreconf -fvi -Werror
-  - scan-build ./configure
+  - scan-build ./configure --enable-oidc-auth --enable-latency-stats --without-protobuf
   - scan-build --status-bugs -o scan-build-src make -j$JOBS
-  - cppcheck --force -q -Isrc/ -Isrc/occtl -Igl/ -I. --error-exitcode=1 src/ -i src/inih
   tags:
-  - shared
-  - linux
+  - saas-linux-small-amd64
   except:
   - tags
   - schedules
@@ -477,6 +422,17 @@ static-analyzers/Fedora:
     when: on_failure
     paths:
       - scan-build-src/*
+
+codingstyle/Fedora:
+  stage: preliminaries
+  image: $CI_REGISTRY/$BUILD_IMAGES_PROJECT:$FEDORA_BUILD
+  script:
+  - find src/ tests/ -name '*.[ch]'| grep -Ev '^(src/http-heads.h|src/pcl|src/protobuf|src/ccan|src/inih|src/llhttp)'| xargs -I{} clang-format -style=file --dry-run {} -Werror
+  tags:
+  - saas-linux-small-amd64
+  except:
+  - tags
+  - schedules
 
 .FreeBSD:
   stage: testing
@@ -510,8 +466,7 @@ pages:
   - make V=1 CODE_COVERAGE_OUTPUT_DIRECTORY=public/coverage CODE_COVERAGE_BRANCH_COVERAGE=1 code-coverage-capture
   - make CODE_COVERAGE_OUTPUT_DIRECTORY=public/coverage local-code-coverage-output
   tags:
-  - shared
-  - linux
+  - saas-linux-small-amd64
   dependencies:
   - Fedora
   only:
@@ -521,13 +476,21 @@ pages:
     - public
 
 triage:
-  stage: testing
+  stage: preliminaries
   image: $CI_REGISTRY/$BUILD_IMAGES_PROJECT:$FEDORA_BUILD
   script:
   - gem install gitlab-triage
-  - gitlab-triage --source-id openconnect/ocserv --token "$API_TOKEN"
+  - gitlab-triage --source-id $CI_PROJECT_ID --token "$API_TOKEN"
   tags:
-  - shared
-  - linux
+  - saas-linux-small-amd64
   only:
   - schedules
+
+codespell/Fedora:
+  stage: preliminaries
+  image: $CI_REGISTRY/$BUILD_IMAGES_PROJECT:$FEDORA_BUILD
+  script:
+  - git submodule update --init
+  - autoreconf -fvi
+  - ./configure
+  - make codespell

@@ -18,31 +18,34 @@
 
 #include <config.h>
 #include "ip-util.h"
+#include "common/common.h"
 #include <string.h>
 #include <stdio.h>
 #include <talloc.h>
 #include <assert.h>
+#include <stddef.h>
 /* for inet_ntop */
 #include <arpa/inet.h>
-#include <syslog.h>
 
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include "log.h"
 
 int ip_cmp(const struct sockaddr_storage *s1, const struct sockaddr_storage *s2)
 {
-	if (((struct sockaddr*)s1)->sa_family == AF_INET) {
+	if (((struct sockaddr *)s1)->sa_family == AF_INET) {
 		return memcmp(SA_IN_P(s1), SA_IN_P(s2), sizeof(struct in_addr));
 	} else { /* inet6 */
-		return memcmp(SA_IN6_P(s1), SA_IN6_P(s2), sizeof(struct in6_addr));
+		return memcmp(SA_IN6_P(s1), SA_IN6_P(s2),
+			      sizeof(struct in6_addr));
 	}
 }
 
 /* returns an allocated string with the mask to apply for the prefix
  */
-char* ipv4_prefix_to_strmask(void *pool, unsigned prefix)
+char *ipv4_prefix_to_strmask(void *pool, unsigned int prefix)
 {
 	struct in_addr in;
 	char str[MAX_IP_STR];
@@ -57,7 +60,7 @@ char* ipv4_prefix_to_strmask(void *pool, unsigned prefix)
 	return talloc_strdup(pool, str);
 }
 
-unsigned ipv6_prefix_to_mask(struct in6_addr *in6, unsigned prefix)
+unsigned int ipv6_prefix_to_mask(struct in6_addr *in6, unsigned int prefix)
 {
 	int i, j;
 
@@ -69,7 +72,7 @@ unsigned ipv6_prefix_to_mask(struct in6_addr *in6, unsigned prefix)
 		if (i >= 8) {
 			in6->s6_addr[j] = 0xff;
 		} else {
-			in6->s6_addr[j] = (unsigned long)(0xffU << ( 8 - i ));
+			in6->s6_addr[j] = (unsigned long)(0xffU << (8 - i));
 		}
 	}
 
@@ -85,7 +88,7 @@ unsigned ipv6_prefix_to_mask(struct in6_addr *in6, unsigned prefix)
 int ip_route_sanity_check(void *pool, char **_route)
 {
 	char *p;
-	unsigned prefix;
+	unsigned int prefix;
 	char *route = *_route, *n;
 	char *slash_ptr, *pstr;
 
@@ -96,7 +99,10 @@ int ip_route_sanity_check(void *pool, char **_route)
 
 	p = strchr(p, '/');
 	if (p == NULL) {
-		fprintf(stderr, "route '%s' in wrong format, use xxx.xxx.xxx.xxx/xxx.xxx.xxx.xxx\n", route);
+		oc_syslog(
+			LOG_ERR,
+			"route '%s' in wrong format, use xxx.xxx.xxx.xxx/xxx.xxx.xxx.xxx\n",
+			route);
 		return -1;
 	}
 	slash_ptr = p;
@@ -111,7 +117,8 @@ int ip_route_sanity_check(void *pool, char **_route)
 
 	pstr = ipv4_prefix_to_strmask(pool, prefix);
 	if (pstr == NULL) {
-		fprintf(stderr, "cannot figure format of route '%s'\n", route);
+		oc_syslog(LOG_ERR, "cannot figure format of route '%s'\n",
+			  route);
 		return -1;
 	}
 
@@ -119,7 +126,7 @@ int ip_route_sanity_check(void *pool, char **_route)
 
 	n = talloc_asprintf(pool, "%s/%s", route, pstr);
 	if (n == NULL) {
-		fprintf(stderr, "memory error\n");
+		oc_syslog(LOG_ERR, "memory error\n");
 		return -1;
 	}
 	*_route = n;
@@ -129,8 +136,7 @@ int ip_route_sanity_check(void *pool, char **_route)
 	return 0;
 }
 
-static
-int bit_count(uint32_t i)
+static int bit_count(uint32_t i)
 {
 	int c = 0;
 	unsigned int seen_one = 0;
@@ -155,8 +161,7 @@ static int mask2prefix(struct in_addr mask)
 	return bit_count(ntohl(mask.s_addr));
 }
 
-static
-int ipv4_mask_to_int(const char *prefix)
+static int ipv4_mask_to_int(const char *prefix)
 {
 	int ret;
 	struct in_addr in;
@@ -186,7 +191,7 @@ char *ipv4_route_to_cidr(void *pool, const char *route)
 	if (p == NULL) {
 		return NULL;
 	}
-	len = (ptrdiff_t)(p-route);
+	len = (ptrdiff_t)(p - route);
 	p++;
 
 	/* if we are in CIDR format exit */
@@ -200,14 +205,14 @@ char *ipv4_route_to_cidr(void *pool, const char *route)
 	return talloc_asprintf(pool, "%.*s/%d", len, route, prefix);
 }
 
-char *human_addr2(const struct sockaddr *sa, socklen_t salen,
-		       void *_buf, size_t buflen, unsigned full)
+char *human_addr2(const struct sockaddr *sa, socklen_t salen, void *_buf,
+		  size_t buflen, unsigned int full)
 {
 	char *save_buf = _buf;
 	char *buf = _buf;
 	size_t l;
 	const char *ret;
-	unsigned port;
+	unsigned int port;
 
 	if (!buf || !buflen)
 		return NULL;
@@ -217,20 +222,26 @@ char *human_addr2(const struct sockaddr *sa, socklen_t salen,
 	}
 
 	if (salen == sizeof(struct sockaddr_in6)) {
-		port = (unsigned)ntohs(((struct sockaddr_in6*)sa)->sin6_port);
+		port = (unsigned int)ntohs(
+			((struct sockaddr_in6 *)sa)->sin6_port);
 
 		if (full != 0 && port != 0) {
-			assert(buflen > 0); /* already checked, but to avoid regression */
+			assert(buflen >
+			       0); /* already checked, but to avoid regression */
 			*buf = '[';
 			buf++;
 			buflen--;
 		}
 
-		ret = inet_ntop(AF_INET6, &((struct sockaddr_in6*)sa)->sin6_addr, buf, buflen);
+		ret = inet_ntop(AF_INET6,
+				&((struct sockaddr_in6 *)sa)->sin6_addr, buf,
+				buflen);
 	} else {
-		port = (unsigned)ntohs(((struct sockaddr_in*)sa)->sin_port);
+		port = (unsigned int)ntohs(
+			((struct sockaddr_in *)sa)->sin_port);
 
-		ret = inet_ntop(AF_INET, &((struct sockaddr_in*)sa)->sin_addr, buf, buflen);
+		ret = inet_ntop(AF_INET, &((struct sockaddr_in *)sa)->sin_addr,
+				buf, buflen);
 	}
 
 	if (ret == NULL) {
@@ -270,31 +281,33 @@ void set_mtu_disc(int fd, int family, int val)
 		y = val;
 #if defined(IPV6_DONTFRAG)
 		if (setsockopt(fd, IPPROTO_IPV6, IPV6_DONTFRAG,
-			       (const void *) &y, sizeof(y)) < 0)
-			syslog(LOG_INFO, "setsockopt(IPV6_DF) failed");
+			       (const void *)&y, sizeof(y)) < 0)
+			oc_syslog(LOG_INFO, "setsockopt(IPV6_DF) failed");
 #elif defined(IPV6_MTU_DISCOVER)
 		if (val)
 			y = IP_PMTUDISC_DO;
 		else
 			y = IP_PMTUDISC_DONT;
 		if (setsockopt(fd, IPPROTO_IPV6, IPV6_MTU_DISCOVER,
-		       (const void *) &y, sizeof(y)) < 0)
-			syslog(LOG_INFO, "setsockopt(IPV6_MTU_DISCOVER) failed");
+			       (const void *)&y, sizeof(y)) < 0)
+			oc_syslog(LOG_INFO,
+				  "setsockopt(IPV6_MTU_DISCOVER) failed");
 #endif
 	} else {
 		y = val;
 #if defined(IP_DONTFRAG)
-		if (setsockopt(fd, IPPROTO_IP, IP_DONTFRAG,
-			       (const void *) &y, sizeof(y)) < 0)
-			syslog(LOG_INFO, "setsockopt(IP_DF) failed");
+		if (setsockopt(fd, IPPROTO_IP, IP_DONTFRAG, (const void *)&y,
+			       sizeof(y)) < 0)
+			oc_syslog(LOG_INFO, "setsockopt(IP_DF) failed");
 #elif defined(IP_MTU_DISCOVER)
 		if (val)
 			y = IP_PMTUDISC_DO;
 		else
 			y = IP_PMTUDISC_DONT;
 		if (setsockopt(fd, IPPROTO_IP, IP_MTU_DISCOVER,
-		       (const void *) &y, sizeof(y)) < 0)
-			syslog(LOG_INFO, "setsockopt(IP_MTU_DISCOVER) failed");
+			       (const void *)&y, sizeof(y)) < 0)
+			oc_syslog(LOG_INFO,
+				  "setsockopt(IP_MTU_DISCOVER) failed");
 #endif
 	}
 }

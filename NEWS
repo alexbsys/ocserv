@@ -1,10 +1,110 @@
-* Version 1.1.3 (unreleased)
+* Version 1.3.1 (unreleased)
+- The bundled protobuf-c was updated to 1.5.1.
+- Fixed issues with PAM authentication when combined with pam_sssd (#618)
+- Enhanced the seccomp filters to address issue in testing (#627)
+
+* Version 1.3.0 (released 2024-05-05)
+- Switch to https://github.com/nodejs/llhttp from http-parser.
+  http-parser was a liability as an unmaintained project (#598)
+- Bump the number of groups per account from 128 to 512 (#219)
+- Allow connecting users to select an authgroup by appending the
+  group name to the URL, as in https://vpn.example.com/groupname;
+  this introduces the select-group-by-url config option (#597).
+- Informational messages due to configuration loading are not printed
+  during worker initialization.
+
+
+* Version 1.2.4 (released 2024-01-22)
+- Get connection speed limits (traffic shaping) from RADIUS (#554)
+- Fix logging to stderr: add missing newline.
+- Fixed compatibility with AnyConnect clients on Linux (#544)
+- Detect the new AnyConnect-compatible identifier of OpenConnect clients
+- occtl: Print bit rates as kb/s.
+
+
+* Version 1.2.3 (released 2023-12-17)
+- Treat unknown clients as capable of IPv6 routes and DNS servers
+- Introduced new ocserv options --log-stderr and --syslog that redirect
+  logging to stderr or syslog explicitly. The stderr option allows for better
+  integration with logging on containers or under systemd. The default remains
+  syslog.
+- The bundled protobuf-c was updated to 1.5.0.
+- Warn when more than 2 DNS server IPv6 addresses are sent by Radius.
+- Improved server shutdown (#563)
+- Modified "Camouflage" functionality to allow AnyConnect clients (#544)
+- Add initial support for Linux on LoongArch.
+- ocserv-fw: Move under libexec.
+- ocserv-fw: Fixed clean_all_rules logic on multiple similar devices (!384)
+- occtl: added machine-readable "raw_connected_at" field for user stats
+
+
+* Version 1.2.2 (released 2023-09-21)
+- Fix session and accounting data tracking of ocserv. This
+  reverts fix for #444 (#541)
+- No longer account ICMP and IGMP data for idle session detection
+
+
+* Version 1.2.1 (released 2023-08-22)
+- Accept the Clavister OneConnect VPN Android client (#485)
+- No longer require to set device name per vhost (#480)
+- Account the correct number of points when proxyproto is in use (#529)
+- nuttcp tests were replaced with iperf3 that is available
+  in more environments
+- occtl: fix duplicate key in `occtl --json show users` output
+
+
+* Version 1.2.0 (released 2023-07-11)
+- Add support for Cisco Enterprise phones to authenticate via
+  the /svc endpoint and the 'cisco-svc-client-compat' config
+  option.
+- Enhanced radius group support to enable radius servers send multiple
+  group class attributes (#489). See doc/README-radius.md for
+  more information.
+- Enhanced the seccomp filters to open files related to FIPS compliance
+  on SuSe (#491)
+- Added "Camouflage" functionality that makes ocserv look
+  like a web server to unauthorized parties.
+- Avoid login failure when the end point of server URI
+  contains a query string.
+- Make sure we print proper JSON with `occtl --debug --json` (#517)
+- Eliminated the need for using the gnulib portability library.
+
+
+* Version 1.1.7 (released 2023-05-07)
+- Emit a LOG_ERR error message with plain authentication fails
+- The bundled inih was updated to r56.
+- The bundled protobuf-c was updated to 1.4.1.
+- Enhanced the seccomp filters for ARMv7 compatibility and musl libc
+- HTTP headers always capitalised as in RFC 9110
+
+
+* Version 1.1.6 (released 2022-02-17)
+- Fixed compatibility with clients on Windows ARM64
+- Added futex() to the accepted list of seccomp. It is required
+  by Fedora 36's libc.
+- Work around change of returned error code in GnuTLS 3.7.3 for
+  gnutls_privkey_import_x509_raw().
+
+
+* Version 1.1.5 (released 2021-11-17)
+- Fixed manpage output
+
+
+* Version 1.1.4 (released 2021-11-13)
+- Added newfstatat() and epoll_pwait() to the accepted list of seccomp
+  calls. This improves compatibility with certain libcs and aarch64.
+- Do not allow assigning the same IPv6 as tun device address and to
+  the client. This allows using /127 as prefix (#430)
+
+
+* Version 1.1.3 (released 2021-06-02)
 - No longer close stdin and stdout on worker processes as they are
   already closed in main process (#394)
-- Advertise X-CSTP-Lease-Duration and X-CSTP-Session-Timeout
+- Advertise X-CSTP-Session-Timeout
 - No longer recommend building with system's libpcl but rather the
   bundled as it is not a very common shared library.
 - Corrected busyloop on failed DTLS handshakes (#400)
+- Emit OWASP best practice headers for HTTP
 
 
 * Version 1.1.2 (released 2020-12-06)
@@ -32,7 +132,7 @@
   a client with an RSA key (#318)
 - Enable a race free user disconnection via occtl (#59)
 - Added the config option of a pre-login-banner (#313)
-- Ocserv siwtched to using multiple ocserv-sm processes to improve scale,
+- Ocserv switched to using multiple ocserv-sm processes to improve scale,
   with the number of ocserv-sm process dependent on maximum clients and
   number of CPUs. Configuration option sec-mod-scale can be used to override
   the heuristics.
@@ -124,7 +224,7 @@
 
 * Version 0.12.0 (released 2018-04-22)
 - Allow DTLS stream to come from different IP from TLS stream.
-  There are situations where internet providers send the UDP 
+  There are situations where internet providers send the UDP
   stream from different IP (#61).
 - Increased possibilities of allowed combinations of authentication
   methods (#108).
@@ -188,13 +288,13 @@
 
 
 * Version 0.11.7 (released 2017-02-12)
-- Fixed compilation issue related to autogen file re-use
+- Fixed compilation issue related to autogen file reuse
 - Send the "vpn-profile-manifest" fields after successful authentication.
   This enables openconnect to retrieve the XML configuration.
 - Enhanced the cert-user-oid config option to read the SAN(rfc822name) value.
   In that case, the username will be read from the subject alternative
   name of the certificate rather than the DN. Based on patch by Johannes Sjøkvist.
-- Do not log the real internal session ID as part of occtl or radius, 
+- Do not log the real internal session ID as part of occtl or radius,
   but instead log a masked value. That ensures that access to log files or
   radius is not sufficient to access an existing session.
 - radius: Handle the special Framed-IP-Address values 255.255.255.254 and
@@ -211,7 +311,7 @@
 * Version 0.11.6 (released 2016-11-14)
 - ocserv: Improved detection of mobile clients (for android and ios clients)
 - ocserv: Update the worker's ID on Radius accounting messages.
-  That is, even if we initially advertize the ID of the worker
+  That is, even if we initially advertise the ID of the worker
   handling the client as NAS-Port, the client may eventually end-up
   being served by another process with different ID. In that case we make
   sure that the radius server is notified on the next accounting message.
@@ -338,13 +438,13 @@
   only a specific service to a specific server.
 - Switched to an event-driven design in main; using libev
 - occtl: Added the show events command to allow viewing the users connecting in
-  real time. 
+  real time.
 
 
 * Version 0.10.9 (released 2015-10-07)
 - When compiled with GnuTLS 3.4 automatically sort the certificate list
   to be imported.
-- Reload the CRL during periodic maintaince if its modification time
+- Reload the CRL during periodic maintenance if its modification time
   changes.
 - Address issue with duplicate check failing on IPv6 addresses (issue #5).
 - Added the ability to specify a UsersFile in plain auth for using an OTP.
@@ -459,7 +559,7 @@
 * Version 0.10.0 (released 2015-03-10)
 - Added support for gssapi (e.g., Kerberos) authentication
 - Added support for alternative authentication methods, via enable-auth.
-  That allows to set a suffcient for login authentication method that will
+  That allows to set a sufficient for login authentication method that will
   be used as alternative to the main authentication.
 - Added support for MS-KKDCP. That is, the server can be used as an HTTP
   proxy to a KDC.
@@ -513,14 +613,14 @@
 - Configuration option 'use-seccomp' was replaced by 'isolate-workers',
   which in addition to seccomp it enables the Linux namespaces restrictions.
 - Added support for stateless compression using LZ4 and LZS. This
-  is disabled by default. 
+  is disabled by default.
 
 
 * Version 0.8.9 (released 2014-12-10)
 - Added configuration option 'listen-host-is-dyndns'. That,
   if set, notifies the client with "X-CSTP-DynDNS: true", in
   CSTP headers.
-- When a client's IP is re-used by the same client connecting with
+- When a client's IP is reused by the same client connecting with
   the cookie (e.g., when roaming), call the disconnect script.
 
 
@@ -581,7 +681,7 @@
 
 * Version 0.8.1 (released 2014-06-28)
 
-- Fix endianess issue with internal messages.
+- Fix endianness issue with internal messages.
 - FreeBSD system fixes, contributed by Brian Chu.
 - Added openconnect 3.20 compatibility.
 - Added support for session control (in PAM or any other potential
@@ -635,7 +735,7 @@
 * Version 0.3.6 (released 2014-05-24)
 
 - Use a variant of memset() that cannot be optimized out while
-  overwritting critical parameters.
+  overwriting critical parameters.
 
 
 * Version 0.3.5 (released 2014-05-08)
@@ -677,7 +777,7 @@
 
 - Allow a number of retries (3) in plain password authentication.
 - Added doc/profile.xml to the distribution.
-- ocserv's '-d' option accepts a numeric argument (0-9) that gradualy
+- ocserv's '-d' option accepts a numeric argument (0-9) that gradually
   increases verbosity.
 - Added the 'mobile-dpd' config option. That allows providing a
   longer DPD value to mobile clients to prevent waking them up
@@ -685,7 +785,7 @@
 - Added the 'idle-timeout' and 'mobile-idle-timeout' config
   options. They ensure that an idle session will be disconnected.
 - Added the 'rekey-method' config option. With this option the
-  advertized rekey method to the client can be overriden.
+  advertised rekey method to the client can be overridden.
 - occtl will now print the bandwidth limits, routes, iroutes, dns
   and nbns values per user.
 - Added configure options to disable checking for certain libraries,
@@ -730,7 +830,7 @@
 - Better display of IP addresses in log messages.
 - Added the use-dbus configuration option. It can be used to disable
   the D-BUS service (and thus the usage of the occtl utility).
-- Added (optional) dependency on protocolbuffer-c, allowing a simpler 
+- Added (optional) dependency on protocolbuffer-c, allowing a simpler
   handling and easier extension of the internal IPC protocol.
 - Added configuration option cisco-client-compat which if enabled
   it allows a client to authenticate by sending its credentials in
@@ -781,7 +881,7 @@
   setting bandwidth limitations globally or per group/user.
 - Call setgroups() after setgid() to avoid propagation of supplementary groups
   to the unprivileged worker processes.
-- If a system's libopts is available as well as automake then the system's 
+- If a system's libopts is available as well as automake then the system's
   libopts will be used.
 - Added --pid-file command line option to ocserv. This overrides any
   configured pid-file.
@@ -809,10 +909,10 @@
 - Instead of suggesting different DTLS and CSTP MTU values, suggest a single
   value to the peer. That avoids issues with openconnect which reads one of
   the suggested values and ignores the other.
-- Added config option "output-buffer" to allow selecting between high throughput 
+- Added config option "output-buffer" to allow selecting between high throughput
   or low latency (following similar openconnect change).
 - Enabled config option "mtu".
-- Configuration file parsing was modified to allow detecting mispellings of
+- Configuration file parsing was modified to allow detecting misspellings of
   directives and unknown options.
 
 
@@ -824,7 +924,7 @@
 
 * Version 0.1.5 (released 2013-07-15)
 
-- More robust support of PAM by allowing more than one factor 
+- More robust support of PAM by allowing more than one factor
   authentication. In practice this allows authentication with more than
   one password (e.g., with a permanent one and an one time password), as
   well as changing the password.
@@ -885,11 +985,11 @@
 
 * Version 0.0.2 (released 2013-03-05)
 
-- Updated HTTP protocol handling (fixes issue with openconnect < 4). 
+- Updated HTTP protocol handling (fixes issue with openconnect < 4).
   Reported by Mike Miller.
 - Use TCP wrappers (libwrap) when present.
 - Fixed issue with the 'local' keyword in DNS server.
-- Added configuration options 'user-profile' and 'always-require-cert' to 
+- Added configuration options 'user-profile' and 'always-require-cert' to
   enable non-openconnect clients to connect. They are enabled with
   the configure option --enable-anyconnect-compat.
 - Allow setting a rate limit on the number of connections.
@@ -903,4 +1003,3 @@
 * Version 0.0.1 (released 2013-02-20)
 
 - First public release
-

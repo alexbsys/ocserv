@@ -33,7 +33,7 @@ RADIUSD=$(which radiusd)
 
 if test -z "${RADIUSD}";then
 	RADIUSD=$(which freeradius)
-fi 
+fi
 
 . `dirname $0`/common.sh
 
@@ -66,25 +66,21 @@ function finish {
   test -n "${CLIPID}" && rm -f ${CLIPID} >/dev/null 2>&1
   test -n "${CONFIG}" && rm -f ${CONFIG} >/dev/null 2>&1
   rm -f ${OUTFILE} 2>&1
+  test -f "${RADIUSLOG}" && cat "${RADIUSLOG}"
+  rm -f "${RADIUSLOG}"
 }
 trap finish EXIT
 
-# server address
-ADDRESS=10.203.2.1
-CLI_ADDRESS=10.203.1.1
-VPNNET=192.168.7.0/24
-VPNADDR=192.168.7.1
-VPNNET6=fd3e:4469:d98:ff54:e437:c9ee:52ac:0/112
-VPNADDR6=fd3e:4469:d98:ff54:e437:c9ee:52ac:1
 OCCTL_SOCKET=./occtl-radius-$$.socket
 USERNAME=test
 
+. `dirname $0`/random-net.sh
 . `dirname $0`/ns.sh
 
 ${CMDNS2} ${IP} link set dev lo up
 
 # Run servers
-${CMDNS2} ${RADIUSD} -d ${srcdir}/data/raddb/ -s -x -l ${RADIUSLOG} &
+${CMDNS2} ${RADIUSD} -d ${srcdir}/data/raddb/ -s -xx -l ${RADIUSLOG} &
 RADIUSPID=$!
 
 update_config radius.config
@@ -98,21 +94,21 @@ sleep 4
 
 # Run clients
 echo " * Testing wrong username at ${ADDRESS}:${PORT}..."
-( echo "test" | ${CMDNS1} ${OPENCONNECT} ${ADDRESS}:${PORT} -u xxx --servercert=d66b507ae074d03b02eafca40d35f87dd81049d3 --cookieonly )
+( echo "test" | ${CMDNS1} ${OPENCONNECT} ${ADDRESS}:${PORT} -u xxx --servercert=pin-sha256:xp3scfzy3rOQsv9NcOve/8YVVv+pHr4qNCXEXrNl5s8= --cookieonly )
 if test $? = 0;then
 	echo "Connected with incorrect username"
 	exit 1
 fi
 
 echo " * Testing wrong password at ${ADDRESS}:${PORT}..."
-( echo "xxx" | ${CMDNS1} ${OPENCONNECT} ${ADDRESS}:${PORT} -u ${USERNAME} --servercert=d66b507ae074d03b02eafca40d35f87dd81049d3 --cookieonly )
+( echo "xxx" | ${CMDNS1} ${OPENCONNECT} ${ADDRESS}:${PORT} -u ${USERNAME} --servercert=pin-sha256:xp3scfzy3rOQsv9NcOve/8YVVv+pHr4qNCXEXrNl5s8= --cookieonly )
 if test $? = 0;then
 	echo "Connected with incorrect password"
 	exit 1
 fi
 
 echo " * Getting cookie from ${ADDRESS}:${PORT}..."
-( echo "test" | ${CMDNS1} ${OPENCONNECT} ${ADDRESS}:${PORT} -u ${USERNAME} --servercert=d66b507ae074d03b02eafca40d35f87dd81049d3 --cookieonly )
+( echo "test" | ${CMDNS1} ${OPENCONNECT} ${ADDRESS}:${PORT} -u ${USERNAME} --servercert=pin-sha256:xp3scfzy3rOQsv9NcOve/8YVVv+pHr4qNCXEXrNl5s8= --cookieonly )
 if test $? != 0;then
 	echo "Could not get cookie from server"
 	exit 1
@@ -120,7 +116,7 @@ fi
 
 echo " * Connecting to ${ADDRESS}:${PORT} with special IP..."
 USERNAME=test-arb
-( echo "${USERNAME}" | ${CMDNS1} ${OPENCONNECT} ${ADDRESS}:${PORT} -u ${USERNAME} --servercert=d66b507ae074d03b02eafca40d35f87dd81049d3 -s ${srcdir}/scripts/vpnc-script --pid-file=${CLIPID} --passwd-on-stdin -b )
+( echo "${USERNAME}" | ${CMDNS1} ${OPENCONNECT} ${ADDRESS}:${PORT} -u ${USERNAME} --servercert=pin-sha256:xp3scfzy3rOQsv9NcOve/8YVVv+pHr4qNCXEXrNl5s8= -s ${srcdir}/scripts/vpnc-script --pid-file=${CLIPID} --passwd-on-stdin -b )
 if test $? != 0;then
 	echo "Could not connect to server"
 	exit 1
@@ -148,14 +144,14 @@ sleep 3
 
 echo " * Connecting to ${ADDRESS}:${PORT}..."
 USERNAME=test
-( echo "${USERNAME}" | ${CMDNS1} ${OPENCONNECT} ${ADDRESS}:${PORT} -u ${USERNAME} --servercert=d66b507ae074d03b02eafca40d35f87dd81049d3 -s ${srcdir}/scripts/vpnc-script --pid-file=${CLIPID} --passwd-on-stdin -b )
+( echo "${USERNAME}" | ${CMDNS1} ${OPENCONNECT} ${ADDRESS}:${PORT} -u ${USERNAME} --servercert=pin-sha256:xp3scfzy3rOQsv9NcOve/8YVVv+pHr4qNCXEXrNl5s8= -s ${srcdir}/scripts/vpnc-script --pid-file=${CLIPID} --passwd-on-stdin -b )
 if test $? != 0;then
 	echo "Could not connect to server"
 	exit 1
 fi
 
 set -e
-${CMDNS2} nuttcp -1
+${CMDNS2} iperf3 -s -D -1
 
 echo " * ping remote address"
 
@@ -166,7 +162,7 @@ ${CMDNS1} ping -c 3 ${VPNADDR}
 ${CMDNS1} ping -6 -c 3 ${VPNADDR6}
 
 echo " * traffic"
-${CMDNS1} nuttcp -T 6 -t ${VPNADDR}
+${CMDNS1} iperf3 -t 6 -c ${VPNADDR}
 
 set +e
 

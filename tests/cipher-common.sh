@@ -58,15 +58,10 @@ function finish {
 trap finish EXIT
 
 # server address
-ADDRESS=10.201.2.1
-CLI_ADDRESS=10.201.1.1
-VPNNET=192.168.2.0/24
-VPNADDR=192.168.2.1
-VPNNET6=fd91:6d87:7341:dc6a::/112
-VPNADDR6=fd91:6d87:7341:dc6a::1
 OCCTL_SOCKET=./occtl-comp-$$.socket
 USERNAME=test
 
+. `dirname $0`/random-net.sh
 . `dirname $0`/ns.sh
 
 if test -z "${TEST_CONFIG}";then
@@ -91,14 +86,14 @@ fi
 
 # Run clients
 echo " * Getting cookie from ${ADDRESS}:${PORT}..."
-( echo "test" | ${CMDNS1} ${OPENCONNECT} ${ADDRESS}:${PORT} -u ${USERNAME} --servercert=d66b507ae074d03b02eafca40d35f87dd81049d3 ${CSTR} --cookieonly )
+( echo "test" | ${CMDNS1} ${OPENCONNECT} ${ADDRESS}:${PORT} -u ${USERNAME} --servercert=pin-sha256:xp3scfzy3rOQsv9NcOve/8YVVv+pHr4qNCXEXrNl5s8= ${CSTR} --cookieonly )
 if test $? != 0;then
 	echo "Could not get cookie from server"
 	exit 1
 fi
 
 echo " * Connecting to ${ADDRESS}:${PORT}..."
-( echo "test" | ${CMDNS1} ${OPENCONNECT} ${ADDRESS}:${PORT} -u ${USERNAME} --servercert=d66b507ae074d03b02eafca40d35f87dd81049d3 ${CSTR} -s ${srcdir}/scripts/vpnc-script --pid-file=${CLIPID} --passwd-on-stdin -b )
+( echo "test" | ${CMDNS1} ${OPENCONNECT} ${ADDRESS}:${PORT} -u ${USERNAME} --servercert=pin-sha256:xp3scfzy3rOQsv9NcOve/8YVVv+pHr4qNCXEXrNl5s8= ${CSTR} -s ${srcdir}/scripts/vpnc-script --pid-file=${CLIPID} --passwd-on-stdin -b )
 if test $? != 0;then
 	echo "Could not connect to server"
 	exit 1
@@ -107,25 +102,28 @@ fi
 set -e
 echo " * ping remote address"
 
-${CMDNS2} nuttcp -1
+${CMDNS2} iperf3 -s -D -1
 
 ${CMDNS1} ping -c 3 ${VPNADDR}
 
 sleep 2
 
-echo " * Transmitting with nuttcp"
+echo " * Transmitting with iperf3"
 
-${CMDNS1} nuttcp -T 6 -t ${VPNADDR}
+${CMDNS1} iperf3 -t 6 -c ${VPNADDR}
 
 # IPv6
-
-${CMDNS2} nuttcp -1
+echo " * Ping with IPv6"
 
 ${CMDNS1} ping -6 -c 3 ${VPNADDR6}
 
-echo " * Receiving with nuttcp"
+${CMDNS2} iperf3 -s -D -1
 
-${CMDNS1} nuttcp -T 6 -r ${VPNADDR}
+sleep 2
+
+echo " * Receiving with iperf3"
+
+${CMDNS1} iperf3 -t 6 -R -c ${VPNADDR}
 
 set +e
 

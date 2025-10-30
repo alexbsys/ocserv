@@ -30,4 +30,3 @@ ${PKG_CONFIG} --atleast-version=8.03 openconnect
 test $? != 0 && exit 77
 
 . cipher-common.sh
-
