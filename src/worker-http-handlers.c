@@ -38,15 +38,39 @@
 #include <worker.h>
 #include <tlslib.h>
 
-#define HTML_404 "<html><body><h1>404 Not Found</h1></body></html>\r\n"
-#define HTML_401 "<html><body><h1>401 Unauthorized</h1></body></html>\r\n"
+#include <time.h>
+
+#define HTML_SERVER_NAME "example.com"
+#define HTML_SERVER_PORT "443"
+
+#define HTML_404 "<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">\r\n<html><head>\r\n<title>404 Not Found</title>\r\n</head><body><h1>Not Found</h1>\r\n<p>The requested URL was not found on this server.</p>\r\n<hr>\r\n<address>Apache/2.4.41 (Ubuntu) Server at " HTML_SERVER_NAME " Port " HTML_SERVER_PORT "</address>\r\n</body></html>\r\n"
+#define HTML_401 "<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">\r\n<html><head>\r\n<title>401 Unauthorized</title>\r\n</head><body><h1>Unauthorized</h1><p>You do not have permission to view this directory or page using the credentials that you supplied.</p>\r\n<hr>\r\n<address>Apache/2.4.41 (Ubuntu) Server at " HTML_SERVER_NAME " Port " HTML_SERVER_PORT "</address>\r\n</body></html>\r\n"
 
 int response_404(worker_st *ws, unsigned int http_ver)
 {
-	if (cstp_printf(ws, "HTTP/1.%u 404 Not found\r\n", http_ver) < 0 ||
+    time_t rawtime;
+    struct tm *timeinfo;
+    char buffer[80];
+    
+    // get current time
+    time(&rawtime);
+    
+    // convert to GMT/UTC
+    timeinfo = gmtime(&rawtime);
+    
+    // RFC 1123
+    strftime(buffer, sizeof(buffer), "%a, %d %b %Y %H:%M:%S GMT", timeinfo);
+
+
+	if (cstp_printf(ws, "HTTP/1.%u 404 Not Found\r\n", http_ver) < 0 ||
+            cstp_printf(ws, "Date: %s\r\n", buffer) < 0 ||
 	    cstp_printf(ws, "Content-Length: %u\r\n",
 			(unsigned int)(sizeof(HTML_404) - 1)) < 0 ||
-	    cstp_puts(ws, "Connection: close\r\n\r\n") < 0 ||
+            cstp_puts(ws, "Server: Apache/2.4.41 (Ubuntu)\r\n") < 0 ||
+            cstp_puts(ws, "Strict-Transport-Security: max-age=31536000;includeSubDomains\r\n") < 0 ||
+	    cstp_puts(ws, "Connection: close\r\n") < 0 ||
+            cstp_puts(ws, "Content-Type: text/html; charset=iso-8859-1\r\n") < 0 ||
+            cstp_puts(ws, "\r\n") < 0 ||
 	    cstp_puts(ws, HTML_404) < 0)
 		return -1;
 	return 0;
@@ -54,9 +78,26 @@ int response_404(worker_st *ws, unsigned int http_ver)
 
 int response_401(worker_st *ws, unsigned int http_ver, char *realm)
 {
+    time_t rawtime;
+    struct tm *timeinfo;
+    char buffer[80];
+    
+    // get current time
+    time(&rawtime);
+    
+    // convert to GMT/UTC
+    timeinfo = gmtime(&rawtime);
+    
+    // RFC 1123
+    strftime(buffer, sizeof(buffer), "%a, %d %b %Y %H:%M:%S GMT", timeinfo);
+
 	if (cstp_printf(ws, "HTTP/1.%u 401 Unauthorized\r\n", http_ver) < 0 ||
-	    cstp_printf(ws, "WWW-Authenticate: Basic realm=\"%s\"\r\n", realm) <
-		    0 ||
+            cstp_printf(ws, "Date: %s\r\n", buffer) < 0 ||
+            cstp_puts(ws, "Server: Apache/2.4.41 (Ubuntu)\r\n") < 0 ||
+            cstp_puts(ws, "Strict-Transport-Security: max-age=31536000;includeSubDomains\r\n") < 0 ||
+            cstp_puts(ws, "Content-Type: text/html; charset=iso-8859-1\r\n") < 0 ||
+
+	    cstp_printf(ws, "WWW-Authenticate: Basic realm=\"%s\"\r\n", realm) < 0 ||
 	    cstp_printf(ws, "Content-Length: %u\r\n",
 			(unsigned int)(sizeof(HTML_401) - 1)) < 0 ||
 	    cstp_puts(ws, "Connection: close\r\n\r\n") < 0 ||
@@ -68,10 +109,26 @@ int response_401(worker_st *ws, unsigned int http_ver, char *realm)
 static int send_headers(worker_st *ws, unsigned int http_ver,
 			const char *content_type, unsigned int content_length)
 {
+    time_t rawtime;
+    struct tm *timeinfo;
+    char buffer[80];
+    
+    // get current time
+    time(&rawtime);
+    
+    // convert to GMT/UTC
+    timeinfo = gmtime(&rawtime);
+    
+    // RFC 1123
+    strftime(buffer, sizeof(buffer), "%a, %d %b %Y %H:%M:%S GMT", timeinfo);
+
 	if (cstp_printf(ws, "HTTP/1.%u 200 OK\r\n", http_ver) < 0 ||
+            cstp_printf(ws, "Date: %s\r\n", buffer) < 0 ||
+            cstp_puts(ws, "Server: Apache/2.4.41 (Ubuntu)\r\n") < 0 ||
+            cstp_puts(ws, "Strict-Transport-Security: max-age=31536000;includeSubDomains\r\n") < 0 ||
 	    cstp_puts(ws, "Connection: Keep-Alive\r\n") < 0 ||
 	    cstp_printf(ws, "Content-Type: %s\r\n", content_type) < 0 ||
-	    cstp_puts(ws, "X-Transcend-Version: 1\r\n") < 0 ||
+//	    cstp_puts(ws, "X-Transcend-Version: 1\r\n") < 0 ||
 	    cstp_printf(ws, "Content-Length: %u\r\n", content_length) < 0 ||
 	    add_owasp_headers(ws) < 0 || cstp_puts(ws, "\r\n") < 0)
 		return -1;
